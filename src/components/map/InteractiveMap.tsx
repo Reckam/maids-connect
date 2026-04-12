@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -37,19 +36,15 @@ const LOCATIONS = [
 export default function InteractiveMap() {
   const [isMounted, setIsMounted] = useState(false);
   const [markerIcon, setMarkerIcon] = useState<L.Icon | undefined>(undefined);
+  // Generate a unique ID to force a fresh DOM container on every mount
+  const [mapKey] = useState(() => `map-${Math.random().toString(36).substring(7)}`);
 
   useEffect(() => {
     setIsMounted(true);
     setMarkerIcon(getMarkerIcon());
-
-    // Cleanup: Ensure any existing map instances on this container are removed
-    // although react-leaflet usually handles this, double-renders in Dev can cause issues.
-    return () => {
-      setIsMounted(false);
-    };
+    return () => setIsMounted(false);
   }, []);
 
-  // Prevent initialization errors by only rendering when fully mounted on client
   if (!isMounted || !markerIcon) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-slate-50">
@@ -59,14 +54,12 @@ export default function InteractiveMap() {
   }
 
   return (
-    <div className="h-full w-full relative" id="map-parent">
+    <div className="h-full w-full relative" key={mapKey}>
       <MapContainer 
         center={[0.3476, 32.5825] as [number, number]} 
         zoom={9} 
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom={true}
-        // Using a truly unique key for each mount prevents "Map container already initialized"
-        key={isMounted ? "active-map" : "inactive-map"}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

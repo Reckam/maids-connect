@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useState } from 'react';
@@ -15,7 +14,8 @@ import {
   Filter,
   Loader2,
   UserPlus,
-  Save
+  Save,
+  ShieldCheck
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -120,6 +120,12 @@ export default function AdminDashboard() {
     if (!db) return;
     const userRef = doc(db, 'users', userId);
     updateDoc(userRef, { is_verified: true })
+      .then(() => {
+        toast({
+          title: "User Verified",
+          description: "The user has been approved and is now visible on the platform.",
+        });
+      })
       .catch(async () => {
         const permissionError = new FirestorePermissionError({
           path: userRef.path,
@@ -187,7 +193,7 @@ export default function AdminDashboard() {
         <div className="flex gap-4">
            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
              <DialogTrigger asChild>
-               <Button className="bg-primary hover:bg-primary/90">
+               <Button className="bg-primary hover:bg-primary/90 rounded-full px-6">
                  <UserPlus className="mr-2 w-4 h-4" /> Add User
                </Button>
              </DialogTrigger>
@@ -291,7 +297,7 @@ export default function AdminDashboard() {
                      )}
                    />
                    <DialogFooter className="mt-6">
-                     <Button type="submit" className="w-full" disabled={isSubmitting}>
+                     <Button type="submit" className="w-full rounded-full" disabled={isSubmitting}>
                        {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
                        Create Profile
                      </Button>
@@ -300,7 +306,6 @@ export default function AdminDashboard() {
                </Form>
              </DialogContent>
            </Dialog>
-           <Button variant="outline" className="bg-slate-800 border-slate-700 hover:bg-slate-700">Export CSV</Button>
         </div>
       </header>
 
@@ -312,7 +317,7 @@ export default function AdminDashboard() {
           { icon: Star, label: "Avg Rating", value: "4.7", trend: "+0.1" },
           { icon: BarChart3, label: "Revenue (UGX)", value: "12M", trend: "+18%" },
         ].map((stat, i) => (
-          <Card key={i} className="bg-slate-800 border-slate-700 text-white shadow-xl">
+          <Card key={i} className="bg-slate-800 border-slate-700 text-white shadow-xl border-none">
              <CardContent className="p-6">
                 <div className="flex justify-between items-center mb-4">
                    <div className="bg-primary/20 p-3 rounded-xl">
@@ -331,11 +336,11 @@ export default function AdminDashboard() {
         <TabsList className="bg-slate-800 border-slate-700">
           <TabsTrigger value="users" className="data-[state=active]:bg-primary">User Management</TabsTrigger>
           <TabsTrigger value="bookings" className="data-[state=active]:bg-primary">Bookings</TabsTrigger>
-          <TabsTrigger value="reports" className="data-[state=active]:bg-primary">Reports & Moderation</TabsTrigger>
+          <TabsTrigger value="reports" className="data-[state=active]:bg-primary">Verification & Moderation</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
-          <Card className="bg-slate-800 border-slate-700 text-white shadow-xl overflow-hidden">
+          <Card className="bg-slate-800 border-slate-700 text-white shadow-xl overflow-hidden border-none">
              <CardHeader className="flex flex-row items-center justify-between border-b border-slate-700">
                 <div>
                    <CardTitle>Users</CardTitle>
@@ -388,39 +393,11 @@ export default function AdminDashboard() {
 
         <TabsContent value="reports">
            <div className="grid md:grid-cols-2 gap-8">
-              <Card className="bg-slate-800 border-slate-700 text-white shadow-xl">
+              <Card className="bg-slate-800 border-slate-700 text-white shadow-xl border-none">
                  <CardHeader>
-                    <CardTitle className="text-red-400">Recent Reports</CardTitle>
-                    <CardDescription className="text-slate-400">Users reported by the community.</CardDescription>
-                 </CardHeader>
-                 <CardContent className="space-y-4">
-                    {reports?.filter(r => r.status === 'pending').map(report => (
-                      <div key={report.id} className="p-4 bg-slate-900/50 rounded-xl border border-slate-700">
-                         <div className="flex justify-between items-start mb-2">
-                            <p className="font-bold text-sm">Reported: <span className="text-red-400">{report.reported_id}</span></p>
-                         </div>
-                         <p className="text-sm text-slate-400 mb-4">{report.reason}</p>
-                         <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              className="bg-red-500 hover:bg-red-600 text-[10px] h-7"
-                              onClick={() => handleResolveReport(report.id)}
-                            >
-                              Resolve
-                            </Button>
-                            <Button size="sm" variant="outline" className="border-slate-700 text-[10px] h-7">Ignore</Button>
-                         </div>
-                      </div>
-                    ))}
-                    {reports?.filter(r => r.status === 'pending').length === 0 && (
-                      <p className="text-center text-slate-500 py-10">No pending reports.</p>
-                    )}
-                 </CardContent>
-              </Card>
-
-              <Card className="bg-slate-800 border-slate-700 text-white shadow-xl">
-                 <CardHeader>
-                    <CardTitle className="text-primary">Verification Requests</CardTitle>
+                    <CardTitle className="text-primary flex items-center gap-2">
+                       <ShieldCheck className="w-5 h-5" /> Verification Requests
+                    </CardTitle>
                     <CardDescription className="text-slate-400">Users waiting for profile verification.</CardDescription>
                  </CardHeader>
                  <CardContent className="space-y-4">
@@ -437,19 +414,51 @@ export default function AdminDashboard() {
                          </div>
                          <div className="flex gap-2">
                             <Button 
-                              size="icon" 
-                              variant="ghost" 
-                              className="text-green-500 hover:bg-green-500/10"
+                              size="sm" 
+                              className="bg-green-500 hover:bg-green-600 text-[10px] h-7 px-3 rounded-full"
                               onClick={() => handleVerifyUser(user.id)}
                             >
-                              <CheckCircle2 />
+                              Approve
                             </Button>
-                            <Button size="icon" variant="ghost" className="text-red-500 hover:bg-red-500/10"><XCircle /></Button>
+                            <Button size="icon" variant="ghost" className="text-red-500 hover:bg-red-500/10 h-7 w-7"><XCircle className="w-4 h-4" /></Button>
                          </div>
                       </div>
                     ))}
                     {users?.filter(u => !u.is_verified).length === 0 && (
-                      <p className="text-center text-slate-500 py-10">No pending verifications.</p>
+                      <div className="text-center py-10">
+                         <CheckCircle2 className="w-10 h-10 text-slate-600 mx-auto mb-2" />
+                         <p className="text-slate-500">No pending verifications.</p>
+                      </div>
+                    )}
+                 </CardContent>
+              </Card>
+
+              <Card className="bg-slate-800 border-slate-700 text-white shadow-xl border-none">
+                 <CardHeader>
+                    <CardTitle className="text-red-400">Recent Reports</CardTitle>
+                    <CardDescription className="text-slate-400">Moderation items reported by users.</CardDescription>
+                 </CardHeader>
+                 <CardContent className="space-y-4">
+                    {reports?.filter(r => r.status === 'pending').map(report => (
+                      <div key={report.id} className="p-4 bg-slate-900/50 rounded-xl border border-slate-700">
+                         <div className="flex justify-between items-start mb-2">
+                            <p className="font-bold text-sm">Reported: <span className="text-red-400">{report.reported_id}</span></p>
+                         </div>
+                         <p className="text-sm text-slate-400 mb-4">{report.reason}</p>
+                         <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              className="bg-red-500 hover:bg-red-600 text-[10px] h-7 rounded-full"
+                              onClick={() => handleResolveReport(report.id)}
+                            >
+                              Resolve
+                            </Button>
+                            <Button size="sm" variant="outline" className="border-slate-700 text-[10px] h-7 rounded-full">Ignore</Button>
+                         </div>
+                      </div>
+                    ))}
+                    {reports?.filter(r => r.status === 'pending').length === 0 && (
+                      <p className="text-center text-slate-500 py-10">No pending reports.</p>
                     )}
                  </CardContent>
               </Card>
