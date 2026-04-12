@@ -38,6 +38,14 @@ export default function LoginPage() {
   const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
   const { toast } = useToast();
 
+  const form = useForm<z.infer<typeof loginSchema>>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
   async function handleGoogleSignIn() {
     if (!auth || !db) return;
     setIsGoogleLoading(true);
