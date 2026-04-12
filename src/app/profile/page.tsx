@@ -16,7 +16,9 @@ import {
   Loader2, 
   ChevronLeft,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  Sparkles,
+  History
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
@@ -37,12 +39,14 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import Link from 'next/link';
+import { aidMaidBioCreation } from '@/ai/flows/aid-maid-bio-creation';
 
 const profileSchema = z.object({
   full_name: z.string().min(2, { message: "Name is too short" }),
   district: z.string().min(2, { message: "Please enter your district" }),
   bio: z.string().min(20, { message: "Bio must be at least 20 characters" }),
   hourly_rate: z.coerce.number().min(1000, { message: "Rate must be at least 1,000 UGX" }),
+  experience: z.coerce.number().min(0, { message: "Experience cannot be negative" }),
   skills: z.string().describe("Comma separated skills"),
   languages: z.string().describe("Comma separated languages"),
   availability: z.string().min(2, { message: "Please describe your availability" }),
@@ -53,6 +57,7 @@ export default function ProfileManagementPage() {
   const db = useFirestore();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
 
   const profileRef = user ? doc(db, 'users', user.uid) : null;
   const { data: profile, loading: loadingProfile } = useDoc(profileRef);
@@ -64,6 +69,7 @@ export default function ProfileManagementPage() {
       district: "",
       bio: "",
       hourly_rate: 0,
+      experience: 0,
       skills: "",
       languages: "",
       availability: "",
@@ -77,12 +83,53 @@ export default function ProfileManagementPage() {
         district: profile.district || "",
         bio: profile.bio || "",
         hourly_rate: profile.hourly_rate || 0,
+        experience: profile.experience || 0,
         skills: profile.skills?.join(", ") || "",
         languages: profile.languages?.join(", ") || "",
         availability: profile.availability || "",
       });
     }
   }, [profile, form]);
+
+  const handleOptimizeBio = async () => {
+    const values = form.getValues();
+    const skillsArray = values.skills.split(",").map(s => s.trim()).filter(s => s !== "");
+    
+    if (skillsArray.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Missing Info",
+        description: "Please add some skills first so the AI can write a better bio for you.",
+      });
+      return;
+    }
+
+    setIsOptimizing(true);
+    try {
+      const result = await aidMaidBioCreation({
+        skills: skillsArray,
+        experience: values.experience,
+        currentBio: values.bio
+      });
+
+      if (result.generatedBio) {
+        form.setValue('bio', result.generatedBio);
+        toast({
+          title: "Bio Optimized!",
+          description: "Your bio has been professionally refined by AI.",
+        });
+      }
+    } catch (error) {
+      console.error(error);
+      toast({
+        variant: "destructive",
+        title: "Optimization Failed",
+        description: "We couldn't reach the AI assistant. Please try again later.",
+      });
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
 
   async function onSubmit(values: z.infer<typeof profileSchema>) {
     if (!profileRef) return;
@@ -93,8 +140,6 @@ export default function ProfileManagementPage() {
       skills: values.skills.split(",").map(s => s.trim()).filter(s => s !== ""),
       languages: values.languages.split(",").map(s => s.trim()).filter(s => s !== ""),
       updated_at: serverTimestamp(),
-      // Reset verification if they are a maid and change major details? 
-      // For now, let's keep it simple.
     };
 
     updateDoc(profileRef, updateData)
@@ -234,12 +279,46 @@ export default function ProfileManagementPage() {
                       />
                     </div>
 
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                       <FormField
+                        control={form.control}
+                        name="experience"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Years of Experience</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <History className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input type="number" {...field} className="pl-10" />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
                     <FormField
                       control={form.control}
                       name="bio"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Professional Bio</FormLabel>
+                          <div className="flex justify-between items-center mb-2">
+                             <FormLabel>Professional Bio</FormLabel>
+                             {isMaid && (
+                               <Button 
+                                 type="button" 
+                                 variant="ghost" 
+                                 size="sm" 
+                                 className="text-primary gap-1 h-7"
+                                 onClick={handleOptimizeBio}
+                                 disabled={isOptimizing}
+                               >
+                                 {isOptimizing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                 AI Optimize
+                               </Button>
+                             )}
+                          </div>
                           <FormControl>
                             <Textarea {...field} placeholder="Describe your experience and what makes you a great choice..." className="min-h-[120px]" />
                           </FormControl>
