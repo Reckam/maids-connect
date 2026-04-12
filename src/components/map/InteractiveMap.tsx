@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { Star } from 'lucide-react';
@@ -36,19 +37,24 @@ const LOCATIONS = [
 export default function InteractiveMap() {
   const [isMounted, setIsMounted] = useState(false);
   const [markerIcon, setMarkerIcon] = useState<L.Icon | undefined>(undefined);
-  // Generate a unique ID to force a fresh DOM container on every mount
-  const [mapKey] = useState(() => `map-${Math.random().toString(36).substring(7)}`);
+  
+  // Use a unique ID that is stable within a mount session but forces a fresh DOM on re-mounts
+  // This is the most robust fix for "Map container is already initialized"
+  const [mapKey] = useState(() => `map-instance-${Math.random().toString(36).substring(7)}`);
 
   useEffect(() => {
     setIsMounted(true);
     setMarkerIcon(getMarkerIcon());
-    return () => setIsMounted(false);
+    return () => {
+      setIsMounted(false);
+    };
   }, []);
 
+  // Early return during SSR or before mount
   if (!isMounted || !markerIcon) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-slate-50">
-        <p className="text-muted-foreground font-medium">Initializing Map Layers...</p>
+        <p className="text-muted-foreground font-medium animate-pulse">Initializing Map Layers...</p>
       </div>
     );
   }
@@ -60,6 +66,8 @@ export default function InteractiveMap() {
         zoom={9} 
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom={true}
+        // Attaching a random ID to the internal container also helps prevent collisions
+        id={`leaflet-container-${mapKey}`}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
