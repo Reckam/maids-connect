@@ -38,9 +38,10 @@ export default function InteractiveMap() {
   const [isMounted, setIsMounted] = useState(false);
   const [markerIcon, setMarkerIcon] = useState<L.Icon | undefined>(undefined);
   
-  // A completely unique key for each mount ensures we never try to re-use an initialized container
-  // This is the primary fix for "Map container is already initialized"
-  const renderKey = useMemo(() => `map-session-${Math.random().toString(36).substring(7)}`, []);
+  // Using a truly unique session key ensures that during development/hot-reloads,
+  // the map container is always treated as a fresh DOM element, preventing the 
+  // "Map container already initialized" error.
+  const sessionKey = useMemo(() => `map-session-${Date.now()}`, []);
 
   useEffect(() => {
     setIsMounted(true);
@@ -53,20 +54,19 @@ export default function InteractiveMap() {
   if (!isMounted || !markerIcon) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-slate-50">
-        <p className="text-muted-foreground font-medium animate-pulse">Initializing Map...</p>
+        <p className="text-muted-foreground font-medium animate-pulse">Initializing Map Instance...</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full w-full relative" key={renderKey}>
+    <div className="h-full w-full relative" key={sessionKey}>
       <MapContainer 
         center={[0.3476, 32.5825] as [number, number]} 
         zoom={9} 
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom={true}
         zoomControl={true}
-        // Avoiding 'id' prop as it often causes collisions with Leaflet's internal registry
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -86,7 +86,9 @@ export default function InteractiveMap() {
                 </div>
                 <div className="text-xs">{loc.district}, Uganda</div>
                 <Link href={`/profile/${loc.id}`}>
-                  <Button size="sm" className="w-full mt-2 h-8 text-[10px] rounded-lg">VIEW PROFILE</Button>
+                  <Button size="sm" className="w-full mt-2 h-8 text-[10px] rounded-lg bg-primary hover:bg-primary/90">
+                    VIEW PROFILE
+                  </Button>
                 </Link>
               </div>
             </Popup>
