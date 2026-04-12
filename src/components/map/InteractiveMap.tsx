@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { Star } from 'lucide-react';
@@ -39,7 +39,8 @@ export default function InteractiveMap() {
   const [markerIcon, setMarkerIcon] = useState<L.Icon | undefined>(undefined);
   
   // A completely unique key for each mount ensures we never try to re-use an initialized container
-  const [renderKey] = useState(() => `map-${Math.random().toString(36).substring(7)}`);
+  // This is the primary fix for "Map container is already initialized"
+  const renderKey = useMemo(() => `map-session-${Math.random().toString(36).substring(7)}`, []);
 
   useEffect(() => {
     setIsMounted(true);
