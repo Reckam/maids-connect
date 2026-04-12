@@ -16,7 +16,9 @@ import {
   LogOut,
   Menu,
   ShieldCheck,
-  ShieldAlert
+  ShieldAlert,
+  AlertTriangle,
+  ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -29,7 +31,6 @@ export default function Dashboard() {
   const db = useFirestore();
   const [isLoading, setIsLoading] = useState(true);
 
-  // In a real app, we'd fetch the actual profile to check user_type
   const userProfileRef = user ? doc(db, 'users', user.uid) : null;
   const { data: profile } = useDoc(userProfileRef);
 
@@ -42,6 +43,8 @@ export default function Dashboard() {
   if (isLoading) return null;
 
   const isAdmin = profile?.user_type === 'admin';
+  const isMaid = profile?.user_type === 'maid';
+  const isVerified = profile?.is_verified === true;
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -89,7 +92,7 @@ export default function Dashboard() {
       <main className="flex-1 p-6 md:p-10 overflow-y-auto">
         <header className="flex justify-between items-center mb-10">
           <div>
-            <h1 className="text-3xl font-bold">Welcome back, {user?.displayName || 'User'}! 👋</h1>
+            <h1 className="text-3xl font-bold">Welcome back, {profile?.full_name || user?.displayName || 'User'}! 👋</h1>
             <p className="text-muted-foreground">Here's what's happening today.</p>
           </div>
           <div className="flex items-center gap-4">
@@ -97,10 +100,34 @@ export default function Dashboard() {
                <Menu />
              </Button>
              <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-md">
-               <img src={user?.photoURL || "https://picsum.photos/seed/user123/48/48"} alt="Profile" />
+               <img src={profile?.avatar_url || user?.photoURL || "https://picsum.photos/seed/user123/48/48"} alt="Profile" />
              </div>
           </div>
         </header>
+
+        {/* Verification Alert for Maids */}
+        {isMaid && !isVerified && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-10 bg-yellow-50 border border-yellow-200 rounded-2xl p-6 flex items-start gap-4"
+          >
+            <div className="bg-yellow-100 p-3 rounded-xl">
+              <AlertTriangle className="text-yellow-600 w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-yellow-800 text-lg">Profile Verification Pending</h3>
+              <p className="text-yellow-700 mt-1">
+                Your profile is currently hidden from employers. Please ensure your profile details are complete, and an admin will review your account shortly.
+              </p>
+              <Link href="/profile">
+                <Button className="mt-4 bg-yellow-600 hover:bg-yellow-700 text-white border-none rounded-full">
+                  Complete Profile <ChevronRight className="ml-2 w-4 h-4" />
+                </Button>
+              </Link>
+            </div>
+          </motion.div>
+        )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
@@ -111,7 +138,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Pending Bookings</p>
-                <p className="text-2xl font-bold">3</p>
+                <p className="text-2xl font-bold">0</p>
               </div>
             </CardContent>
           </Card>
@@ -122,7 +149,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Completed Jobs</p>
-                <p className="text-2xl font-bold">12</p>
+                <p className="text-2xl font-bold">0</p>
               </div>
             </CardContent>
           </Card>
@@ -133,7 +160,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Average Rating</p>
-                <p className="text-2xl font-bold">4.8</p>
+                <p className="text-2xl font-bold">0.0</p>
               </div>
             </CardContent>
           </Card>
@@ -144,7 +171,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Scheduled Today</p>
-                <p className="text-2xl font-bold">1</p>
+                <p className="text-2xl font-bold">0</p>
               </div>
             </CardContent>
           </Card>
@@ -154,75 +181,50 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold">Upcoming Bookings</h2>
+              <h2 className="text-xl font-bold">Recent Activity</h2>
               <Link href="/bookings" className="text-primary text-sm font-medium hover:underline">View All</Link>
             </div>
             
-            <div className="space-y-4">
-              {[1, 2].map((i) => (
-                <Card key={i} className="border-none shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-                  <div className="flex flex-col md:flex-row">
-                    <div className="w-full md:w-48 h-32 md:h-auto bg-slate-100">
-                      <img src={`https://picsum.photos/seed/booking${i}/200/200`} alt="Job" className="w-full h-full object-cover" />
-                    </div>
-                    <div className="p-6 flex-1">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <h3 className="font-bold text-lg">{profile?.user_type === 'employer' ? "Namubiru Mary" : "Nalule House Cleaning"}</h3>
-                          <p className="text-sm text-muted-foreground flex items-center gap-1">
-                            <MapIcon className="w-3 h-3" /> Kampala, Makindye
-                          </p>
-                        </div>
-                        <div className="bg-primary/10 text-primary text-xs font-bold px-3 py-1 rounded-full">
-                          CONFIRMED
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-4 text-sm mt-4">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-muted-foreground" />
-                          <span>Oct {24 + i}, 2023</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-muted-foreground" />
-                          <span>09:00 AM - 01:00 PM</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
+            <Card className="border-none shadow-sm p-10 text-center">
+              <p className="text-muted-foreground italic">No recent activity to show.</p>
+              {profile?.user_type === 'employer' && (
+                <Link href="/browse">
+                  <Button className="mt-4 rounded-full">Book your first maid</Button>
+                </Link>
+              )}
+            </Card>
           </div>
 
           <div className="space-y-6">
              <h2 className="text-xl font-bold">Quick Actions</h2>
              <div className="grid grid-cols-1 gap-4">
-                <Link href="/browse">
-                  <Button className="w-full h-16 bg-primary text-lg font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all">
-                    Find a Maid
-                  </Button>
-                </Link>
+                {profile?.user_type === 'employer' && (
+                  <Link href="/browse">
+                    <Button className="w-full h-16 bg-primary text-lg font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all">
+                      Find a Maid
+                    </Button>
+                  </Link>
+                )}
+                {isMaid && (
+                  <Link href="/profile">
+                    <Button className="w-full h-16 bg-primary text-lg font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all">
+                      Update My Resume
+                    </Button>
+                  </Link>
+                )}
                 <Link href="/map">
                   <Button variant="secondary" className="w-full h-16 bg-white border border-border text-lg font-bold rounded-2xl hover:bg-slate-50 transition-all">
                     View Interactive Map
-                  </Button>
-                </Link>
-                <Link href="/profile">
-                  <Button variant="ghost" className="w-full h-16 text-lg font-bold rounded-2xl hover:bg-primary/5 transition-all">
-                    Update My Profile
                   </Button>
                 </Link>
              </div>
              
              <Card className="bg-gradient-to-br from-primary to-secondary text-white border-none shadow-xl overflow-hidden relative">
                <div className="p-6 relative z-10">
-                 <h3 className="text-xl font-bold mb-2">Did you know?</h3>
+                 <h3 className="text-xl font-bold mb-2">Platform Tips</h3>
                  <p className="text-white/80 text-sm">
-                   Verified maids get 3x more bookings! Update your ID today.
+                   {isMaid ? "Verified maids get 3x more bookings! Complete your profile today." : "Always review your maid after the service to help others!"}
                  </p>
-                 <Button variant="secondary" className="mt-4 bg-white text-primary rounded-full px-6 h-9 font-bold text-xs">
-                   LEARN MORE
-                 </Button>
                </div>
                <div className="absolute -bottom-4 -right-4 bg-white/10 w-24 h-24 rounded-full" />
              </Card>
