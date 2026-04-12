@@ -1,8 +1,8 @@
+
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
 import { 
   ShieldCheck, 
   MapPin, 
@@ -12,7 +12,6 @@ import {
   CheckCircle2, 
   MessageSquare, 
   ChevronLeft,
-  Calendar as CalendarIcon,
   Sparkles,
   Loader2,
   ArrowLeft
@@ -22,52 +21,23 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { createClient } from '@/supabase/client';
+import { useDoc, useFirestore } from '@/firebase';
+import { doc } from 'firebase/firestore';
 
 export default function ProfileDetails() {
   const { id } = useParams();
   const { toast } = useToast();
   const router = useRouter();
-  const [isGeneratingBio, setIsGeneratingBio] = useState(false);
-  const [profile, setProfile] = useState<any>(null);
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const supabase = createClient();
+  const db = useFirestore();
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      if (!id) return;
-      setIsLoading(true);
-      try {
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', id)
-          .single();
-
-        if (userError) throw userError;
-        setProfile(userData);
-
-        // In a real app, you'd fetch reviews for the user
-        setReviews([]); // For now, no reviews
-
-      } catch (error) {
-        console.error('Error fetching profile:', error);
-        toast({ variant: 'destructive', title: 'Failed to load profile' });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchProfile();
-  }, [id, supabase, toast]);
+  const userRef = useMemo(() => (id && db ? doc(db, 'users', id as string) : null), [id, db]);
+  const { data: profile, loading: isLoading } = useDoc(userRef);
 
   const handleBookNow = () => {
     toast({
       title: "Booking Initiated",
-      description: "Redirecting you to the booking form...",
+      description: "This feature will be available soon!",
     });
-    // In a real app, you'd redirect to a booking page
   };
 
   if (isLoading) {
@@ -136,7 +106,7 @@ export default function ProfileDetails() {
                 </div>
 
                 <div className="space-y-3 pt-4">
-                   <p className="text-primary font-bold text-xl">UGX {profile.rate?.toLocaleString() || 'N/A'}/hr</p>
+                   <p className="text-primary font-bold text-xl">UGX {profile.hourly_rate?.toLocaleString() || 'N/A'}/hr</p>
                    <Button onClick={handleBookNow} className="w-full h-12 bg-primary text-lg rounded-xl">Book Now</Button>
                    <Button variant="outline" className="w-full h-12 border-primary text-primary rounded-xl">
                      <MessageSquare className="mr-2 w-4 h-4" /> Contact
@@ -168,17 +138,9 @@ export default function ProfileDetails() {
 
           {/* Right Column - Skills, Bio, Reviews */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Bio Section with AI Assistant Link */}
             <Card className="border-none shadow-lg">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>About Me</CardTitle>
-                <div className="flex gap-2">
-                   {/* This button is only visible to the profile owner normally */}
-                   <Button variant="ghost" size="sm" className="text-primary gap-1" disabled={isGeneratingBio}>
-                     <Sparkles className="w-4 h-4" /> 
-                     <span className="hidden sm:inline">AI Bio Optimizer</span>
-                   </Button>
-                </div>
               </CardHeader>
               <CardContent>
                 <p className="text-lg leading-relaxed text-slate-700">
@@ -200,32 +162,9 @@ export default function ProfileDetails() {
               </CardContent>
             </Card>
 
-            {/* Reviews Section */}
             <div className="space-y-4">
-              <h2 className="text-2xl font-bold">Reviews ({reviews.length})</h2>
-              {reviews.length > 0 ? reviews.map(review => (
-                <Card key={review.id} className="border-none shadow-sm hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-primary">
-                          {review.user.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="font-bold">{review.user}</p>
-                          <p className="text-xs text-muted-foreground">{review.date}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 text-yellow-500">
-                         {Array.from({ length: review.rating }).map((_, i) => (
-                           <Star key={i} className="w-4 h-4 fill-current" />
-                         ))}
-                      </div>
-                    </div>
-                    <p className="text-slate-600">"{review.comment}"</p>
-                  </CardContent>
-                </Card>
-              )) : <p className='text-sm text-muted-foreground'>No reviews yet.</p>}
+              <h2 className="text-2xl font-bold">Reviews</h2>
+              <p className='text-sm text-muted-foreground'>No reviews yet.</p>
             </div>
           </div>
         </div>

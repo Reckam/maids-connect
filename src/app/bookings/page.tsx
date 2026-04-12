@@ -1,42 +1,34 @@
+
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, MapPin, User, ChevronRight, Loader2, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { useUser } from '@/supabase/auth/use-user';
-import { createClient } from '@/supabase/client';
+import { useUser, useCollection, useFirestore } from '@/firebase';
+import { collection, query, where, or } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 
 export default function BookingsPage() {
-  const user = useUser();
-  const supabase = createClient();
+  const { user } = useUser();
+  const db = useFirestore();
   const router = useRouter();
-  const [bookings, setBookings] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchBookings = async () => {
-      if (!user) return;
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('bookings')
-          .select('*, client:client_id(*), maid:maid_id(*)')
-          // .or(`client_id.eq.${user.id},maid_id.eq.${user.id}`)
-        if (error) throw error;
-        setBookings(data || []);
-      } catch (error) {
-        console.error("Error fetching bookings:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchBookings();
-  }, [user, supabase]);
+  const bookingsQuery = useMemo(() => {
+    if (!user || !db) return null;
+    return query(
+      collection(db, 'bookings'),
+      or(
+        where('employer_id', '==', user.uid),
+        where('maid_id', '==', user.uid)
+      )
+    );
+  }, [user, db]);
+
+  const { data: bookings, loading: isLoading } = useCollection(bookingsQuery);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -52,7 +44,7 @@ export default function BookingsPage() {
     const filtered = status ? bookings.filter(b => b.status === status) : bookings;
 
     if (isLoading) {
-        return <div className='grid place-content-center h-40'><Loader2 className='animate-spin'/></div>
+        return <div className='grid place-content-center h-40'><Loader2 className='animate-spin text-primary'/></div>
     }
 
     if (filtered.length === 0) {
@@ -77,9 +69,9 @@ export default function BookingsPage() {
                       <User className="text-primary w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="font-bold">{booking.client?.full_name || 'N/A'}</h3>
+                      <h3 className="font-bold">Booking #{booking.id.slice(0, 8)}</h3>
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <MapPin className="w-3 h-3" /> {booking.client?.district || 'N/A'}
+                        <MapPin className="w-3 h-3" /> Status: {booking.status}
                       </p>
                     </div>
                   </div>
@@ -91,17 +83,15 @@ export default function BookingsPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4 border-y border-slate-50">
                   <div className="space-y-1">
                     <p className="text-[10px] text-muted-foreground uppercase">Date</p>
-                    <p className="text-sm font-medium flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(booking.booking_date).toLocaleDateString()}</p>
+                    <p className="text-sm font-medium flex items-center gap-1"><Calendar className="w-3 h-3" /> {booking.date}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-[10px] text-muted-foreground uppercase">Time</p>
-                    <p className="text-sm font-medium flex items-center gap-1"><Clock className="w-3 h-3" /> {booking.booking_time}</p>
+                    <p className="text-sm font-medium flex items-center gap-1"><Clock className="w-3 h-3" /> {booking.time}</p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground uppercase">Services</p>
-                    <div className="flex flex-wrap gap-1">
-                      {booking.services?.map((s: string) => <span key={s} className="text-xs font-medium">{s}</span>)}
-                    </div>
+                    <p className="text-[10px] text-muted-foreground uppercase">Duration</p>
+                    <p className="text-sm font-medium">{booking.duration} hrs</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-[10px] text-muted-foreground uppercase">Total Pay</p>
@@ -110,15 +100,6 @@ export default function BookingsPage() {
                 </div>
 
                 <div className="mt-4 flex justify-end gap-2">
-                   {booking.status === 'pending' && (
-                     <>
-                        <Button variant="outline" size="sm" className="rounded-full text-red-500 border-red-200 hover:bg-red-50">Reject</Button>
-                        <Button size="sm" className="rounded-full bg-primary hover:bg-primary/90 px-6">Accept</Button>
-                     </>
-                   )}
-                   {booking.status === 'confirmed' && (
-                     <Button variant="outline" size="sm" className="rounded-full">Mark as Completed</Button>
-                   )}
                    <Button variant="ghost" size="sm" className="rounded-full text-muted-foreground group-hover:text-primary transition-colors">
                      View Details <ChevronRight className="ml-1 w-4 h-4" />
                    </Button>
@@ -151,14 +132,12 @@ export default function BookingsPage() {
             <TabsTrigger value="pending" className="rounded-full px-6 data-[state=active]:bg-primary data-[state=active]:text-white">Pending</TabsTrigger>
             <TabsTrigger value="confirmed" className="rounded-full px-6 data-[state=active]:bg-primary data-[state=active]:text-white">Confirmed</TabsTrigger>
             <TabsTrigger value="completed" className="rounded-full px-6 data-[state=active]:bg-primary data-[state=active]:text-white">Completed</TabsTrigger>
-            <TabsTrigger value="cancelled" className="rounded-full px-6 data-[state=active]:bg-primary data-[state=active]:text-white">Cancelled</TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="mt-0"><BookingList /></TabsContent>
           <TabsContent value="pending" className="mt-0"><BookingList status="pending" /></TabsContent>
           <TabsContent value="confirmed" className="mt-0"><BookingList status="confirmed" /></TabsContent>
           <TabsContent value="completed" className="mt-0"><BookingList status="completed" /></TabsContent>
-          <TabsContent value="cancelled" className="mt-0"><BookingList status="cancelled" /></TabsContent>
         </Tabs>
       </div>
     </div>
