@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { Star } from 'lucide-react';
@@ -38,9 +38,8 @@ export default function InteractiveMap() {
   const [isMounted, setIsMounted] = useState(false);
   const [markerIcon, setMarkerIcon] = useState<L.Icon | undefined>(undefined);
   
-  // Use a unique ID that is stable within a mount session but forces a fresh DOM on re-mounts
-  // This is the most robust fix for "Map container is already initialized"
-  const [mapKey] = useState(() => `map-instance-${Math.random().toString(36).substring(7)}`);
+  // A completely unique key for each mount ensures we never try to re-use an initialized container
+  const [renderKey] = useState(() => `map-${Math.random().toString(36).substring(7)}`);
 
   useEffect(() => {
     setIsMounted(true);
@@ -50,24 +49,23 @@ export default function InteractiveMap() {
     };
   }, []);
 
-  // Early return during SSR or before mount
   if (!isMounted || !markerIcon) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-slate-50">
-        <p className="text-muted-foreground font-medium animate-pulse">Initializing Map Layers...</p>
+        <p className="text-muted-foreground font-medium animate-pulse">Initializing Map...</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full w-full relative" key={mapKey}>
+    <div className="h-full w-full relative" key={renderKey}>
       <MapContainer 
         center={[0.3476, 32.5825] as [number, number]} 
         zoom={9} 
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom={true}
-        // Attaching a random ID to the internal container also helps prevent collisions
-        id={`leaflet-container-${mapKey}`}
+        zoomControl={true}
+        // Avoiding 'id' prop as it often causes collisions with Leaflet's internal registry
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
