@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -18,6 +19,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -25,6 +29,8 @@ const loginSchema = z.object({
 });
 
 export default function LoginPage() {
+  const auth = useAuth();
+  const router = useRouter();
   const [showPassword, setShowPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const { toast } = useToast();
@@ -39,16 +45,22 @@ export default function LoginPage() {
 
   async function onSubmit(values: z.infer<typeof loginSchema>) {
     setIsLoading(true);
-    // Mock login delay
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      await signInWithEmailAndPassword(auth, values.email, values.password);
       toast({
         title: "Login Successful",
         description: "Welcome back to Maids Connect!",
       });
-      // Redirect to dashboard normally happens here
-      window.location.href = '/dashboard';
-    }, 1500);
+      router.push('/dashboard');
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Login Failed",
+        description: error.message || "Invalid credentials. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (

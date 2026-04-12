@@ -1,8 +1,9 @@
+
 "use client";
 
 import React, { Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -19,6 +20,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth, useFirestore } from '@/firebase';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 const registerSchema = z.object({
   full_name: z.string().min(2, { message: "Name is too short" }),
@@ -27,6 +31,9 @@ const registerSchema = z.object({
 });
 
 function RegisterForm() {
+  const auth = useAuth();
+  const db = useFirestore();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const role = searchParams.get('role') || 'employer';
   const [showPassword, setShowPassword] = React.useState(false);
@@ -44,14 +51,42 @@ function RegisterForm() {
 
   async function onSubmit(values: z.infer<typeof registerSchema>) {
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const user = userCredential.user;
+
+      await updateProfile(user, {
+        displayName: values.full_name,
+      });
+
+      // Create profile in Firestore
+      await setDoc(doc(db, 'users', user.uid), {
+        full_name: values.full_name,
+        email: values.email,
+        user_type: role,
+        is_verified: role === 'employer', // Employers are verified by default for simplicity
+        created_at: serverTimestamp(),
+        avatar_url: `https://picsum.photos/seed/${user.uid}/200/200`,
+        rating: 0,
+        review_count: 0,
+        skills: [],
+        languages: [],
+      });
+
       toast({
         title: "Account Created",
         description: `Welcome to Maids Connect! Profile: ${role}`,
       });
-      window.location.href = '/dashboard';
-    }, 1500);
+      router.push('/dashboard');
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Registration Failed",
+        description: error.message || "An error occurred during registration.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
