@@ -18,10 +18,13 @@ import {
   ShieldCheck,
   ShieldAlert,
   AlertTriangle,
-  ChevronRight
+  ChevronRight,
+  Loader2,
+  Mail
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { useUser, useDoc, useFirestore, useAuth } from '@/firebase';
 import { doc } from 'firebase/firestore';
@@ -29,7 +32,7 @@ import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 
 export default function Dashboard() {
-  const user = useUser();
+  const { user, loading: authLoading } = useUser();
   const db = useFirestore();
   const auth = useAuth();
   const router = useRouter();
@@ -44,7 +47,7 @@ export default function Dashboard() {
     }
   };
 
-  if (isLoading) return (
+  if (authLoading || isLoading) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <Loader2 className="animate-spin text-primary w-10 h-10" />
     </div>
@@ -86,7 +89,19 @@ export default function Dashboard() {
             </Link>
           )}
         </nav>
-        <div className="p-4 border-t border-border space-y-2">
+        <div className="p-4 border-t border-border space-y-4">
+          <div className="px-3">
+             <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-2">Signed in as</p>
+             <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-100">
+                  <img src={profile?.avatar_url || `https://picsum.photos/seed/${user?.uid}/24/24`} alt="" />
+                </div>
+                <div className="flex-1 overflow-hidden">
+                   <p className="text-xs font-bold truncate">{profile?.full_name}</p>
+                   <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
+                </div>
+             </div>
+          </div>
           <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleLogout}>
             <LogOut className="w-5 h-5 mr-3" /> Logout
           </Button>
@@ -97,12 +112,17 @@ export default function Dashboard() {
       <main className="flex-1 p-6 md:p-10 overflow-y-auto">
         <header className="flex justify-between items-center mb-10">
           <div>
-            <h1 className="text-3xl font-bold">Welcome back, {profile?.full_name || user?.email || 'User'}! 👋</h1>
-            <p className="text-muted-foreground">Here's what's happening today.</p>
+            <h1 className="text-3xl font-bold">Welcome back, {profile?.full_name || 'User'}! 👋</h1>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant="secondary" className="capitalize">{profile?.user_type || 'User'}</Badge>
+              <span className="text-muted-foreground text-sm flex items-center gap-1">
+                <Mail className="w-3 h-3" /> {user?.email}
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-4">
              <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-md">
-               <img src={profile?.avatar_url || "https://picsum.photos/seed/user123/48/48"} alt="Profile" />
+               <img src={profile?.avatar_url || `https://picsum.photos/seed/${user?.uid}/48/48`} alt="Profile" />
              </div>
           </div>
         </header>
@@ -162,7 +182,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Average Rating</p>
-                <p className="text-2xl font-bold">0.0</p>
+                <p className="text-2xl font-bold">{profile?.rating || '0.0'}</p>
               </div>
             </CardContent>
           </Card>
@@ -225,5 +245,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
-import { Loader2 } from 'lucide-react';
