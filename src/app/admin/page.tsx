@@ -7,22 +7,19 @@ import {
   Calendar, 
   ShieldAlert, 
   Star, 
-  BarChart3, 
   CheckCircle2, 
   XCircle, 
-  MoreHorizontal,
-  Search,
   Loader2,
   UserPlus,
   Save,
   ShieldCheck,
   ArrowLeft,
   Database,
-  Eye
+  Eye,
+  Lock
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -57,8 +54,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { useCollection, useFirestore } from '@/firebase';
+import { Input } from "@/components/ui/input";
+import { useCollection, useFirestore, useUser, useDoc } from '@/firebase';
 import { collection, query, limit, doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -80,6 +77,7 @@ const addUserSchema = z.object({
 type AddUserValues = z.infer<typeof addUserSchema>;
 
 export default function AdminDashboard() {
+  const { user } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
@@ -87,7 +85,11 @@ export default function AdminDashboard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeDataTab, setActiveDataTab] = useState('users');
 
-  // Memoized Queries
+  // Fetch current user profile to check for admin role
+  const userProfileRef = useMemo(() => (user && db ? doc(db, 'users', user.uid) : null), [user, db]);
+  const { data: profile, loading: loadingProfile } = useDoc(userProfileRef);
+
+  // Memoized Queries for Dashboard Data
   const usersQuery = useMemo(() => db ? query(collection(db, 'users'), limit(50)) : null, [db]);
   const reportsQuery = useMemo(() => db ? query(collection(db, 'reports'), limit(50)) : null, [db]);
   const bookingsQuery = useMemo(() => db ? query(collection(db, 'bookings'), limit(50)) : null, [db]);
@@ -179,10 +181,39 @@ export default function AdminDashboard() {
       });
   };
 
-  if (loadingUsers || loadingReports || loadingBookings) {
+  if (loadingProfile || loadingUsers || loadingReports || loadingBookings) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <Loader2 className="w-10 h-10 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  // Permission Check
+  if (profile?.user_type !== 'admin') {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6">
+        <Card className="max-w-md w-full bg-slate-900 border-slate-800 shadow-2xl">
+          <CardHeader className="text-center">
+            <Lock className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <CardTitle className="text-2xl font-bold">Access Denied</CardTitle>
+            <CardDescription className="text-slate-400">
+              Only platform administrators can access this console.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6 text-center">
+            <div className="p-4 bg-slate-950 rounded-xl border border-slate-800">
+               <p className="text-xs text-slate-500 mb-2 uppercase tracking-widest">Your Unique User ID</p>
+               <code className="text-primary font-mono text-sm break-all">{user?.uid}</code>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              To gain access, you must change your <b>user_type</b> to <b>"admin"</b> in the Firestore "users" collection for the ID above using the Firebase Console.
+            </p>
+            <Button className="w-full rounded-full h-11" variant="outline" onClick={() => router.push('/dashboard')}>
+              Return to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -191,8 +222,8 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-slate-950 text-white p-6 md:p-10">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" className="bg-slate-900 border-slate-800 hover:bg-slate-800"
-              onClick={() => router.back()}>
+          <Button variant="outline" size="icon" className="bg-slate-900 border-slate-800 hover:bg-slate-800 rounded-full"
+              onClick={() => router.push('/dashboard')}>
               <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -354,17 +385,17 @@ export default function AdminDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {users?.map(user => (
-                        <TableRow key={user.id} className="border-slate-800 hover:bg-slate-800/30">
-                          <TableCell className="font-medium">{user.full_name}</TableCell>
-                          <TableCell className="text-slate-400 text-xs">{user.email}</TableCell>
-                          <TableCell><Badge variant="outline" className="capitalize border-slate-700">{user.user_type}</Badge></TableCell>
+                      {users?.map(u => (
+                        <TableRow key={u.id} className="border-slate-800 hover:bg-slate-800/30">
+                          <TableCell className="font-medium">{u.full_name}</TableCell>
+                          <TableCell className="text-slate-400 text-xs">{u.email}</TableCell>
+                          <TableCell><Badge variant="outline" className="capitalize border-slate-700">{u.user_type}</Badge></TableCell>
                           <TableCell>
-                            <Badge className={user.is_verified ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'}>
-                              {user.is_verified ? 'Verified' : 'Pending'}
+                            <Badge className={u.is_verified ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'}>
+                              {u.is_verified ? 'Verified' : 'Pending'}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right text-slate-400">{user.district || 'N/A'}</TableCell>
+                          <TableCell className="text-right text-slate-400">{u.district || 'N/A'}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -450,22 +481,22 @@ export default function AdminDashboard() {
                     <CardDescription className="text-slate-400">Review and approve new domestic workers.</CardDescription>
                  </CardHeader>
                  <CardContent className="space-y-4">
-                    {users?.filter(u => !u.is_verified && u.user_type === 'maid').map(user => (
-                      <div key={user.id} className="flex items-center justify-between p-4 bg-slate-950/50 rounded-xl border border-slate-800">
+                    {users?.filter(u => !u.is_verified && u.user_type === 'maid').map(u => (
+                      <div key={u.id} className="flex items-center justify-between p-4 bg-slate-950/50 rounded-xl border border-slate-800">
                          <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-slate-900 overflow-hidden ring-2 ring-slate-800">
-                              <img src={user.avatar_url || `https://picsum.photos/seed/${user.id}/40/40`} alt="" />
+                              <img src={u.avatar_url || `https://picsum.photos/seed/${u.id}/40/40`} alt="" />
                             </div>
                             <div>
-                               <p className="font-bold text-sm">{user.full_name}</p>
-                               <p className="text-[10px] text-slate-500">{user.district || 'No location'}</p>
+                               <p className="font-bold text-sm">{u.full_name}</p>
+                               <p className="text-[10px] text-slate-500">{u.district || 'No location'}</p>
                             </div>
                          </div>
                          <div className="flex gap-2">
                             <Button 
                               size="sm" 
                               className="bg-green-500 hover:bg-green-600 text-[10px] h-7 px-4 rounded-full"
-                              onClick={() => handleVerifyUser(user.id)}
+                              onClick={() => handleVerifyUser(u.id)}
                             >
                               Approve
                             </Button>
