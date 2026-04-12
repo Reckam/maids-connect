@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -40,6 +41,12 @@ export default function InteractiveMap() {
   useEffect(() => {
     setIsMounted(true);
     setMarkerIcon(getMarkerIcon());
+
+    // Cleanup: Ensure any existing map instances on this container are removed
+    // although react-leaflet usually handles this, double-renders in Dev can cause issues.
+    return () => {
+      setIsMounted(false);
+    };
   }, []);
 
   // Prevent initialization errors by only rendering when fully mounted on client
@@ -52,38 +59,40 @@ export default function InteractiveMap() {
   }
 
   return (
-    <MapContainer 
-      center={[0.3476, 32.5825] as [number, number]} 
-      zoom={9} 
-      style={{ height: '100%', width: '100%' }}
-      scrollWheelZoom={true}
-      // A unique key helps React distinguish this instance during HMR
-      key="maids-connect-v1"
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      {LOCATIONS.map((loc) => (
-        <Marker 
-          key={loc.id} 
-          position={loc.pos as [number, number]} 
-          icon={markerIcon}
-        >
-          <Popup>
-            <div className="p-2 space-y-2 min-w-[150px]">
-              <div className="font-bold text-sm">{loc.name}</div>
-              <div className="text-xs text-muted-foreground flex items-center gap-1">
-                <Star className="w-3 h-3 text-yellow-600 fill-yellow-600" /> {loc.rating} Rating
+    <div className="h-full w-full relative" id="map-parent">
+      <MapContainer 
+        center={[0.3476, 32.5825] as [number, number]} 
+        zoom={9} 
+        style={{ height: '100%', width: '100%' }}
+        scrollWheelZoom={true}
+        // Using a truly unique key for each mount prevents "Map container already initialized"
+        key={isMounted ? "active-map" : "inactive-map"}
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        {LOCATIONS.map((loc) => (
+          <Marker 
+            key={loc.id} 
+            position={loc.pos as [number, number]} 
+            icon={markerIcon}
+          >
+            <Popup>
+              <div className="p-2 space-y-2 min-w-[150px]">
+                <div className="font-bold text-sm">{loc.name}</div>
+                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Star className="w-3 h-3 text-yellow-600 fill-yellow-600" /> {loc.rating} Rating
+                </div>
+                <div className="text-xs">{loc.district}, Uganda</div>
+                <Link href={`/profile/${loc.id}`}>
+                  <Button size="sm" className="w-full mt-2 h-8 text-[10px] rounded-lg">VIEW PROFILE</Button>
+                </Link>
               </div>
-              <div className="text-xs">{loc.district}, Uganda</div>
-              <Link href={`/profile/${loc.id}`}>
-                <Button size="sm" className="w-full mt-2 h-8 text-[10px] rounded-lg">VIEW PROFILE</Button>
-              </Link>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-    </MapContainer>
+            </Popup>
+          </Marker>
+        ))}
+      </MapContainer>
+    </div>
   );
 }

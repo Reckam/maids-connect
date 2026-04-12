@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -14,22 +15,33 @@ import {
   Settings,
   LogOut,
   Menu,
-  ShieldCheck
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import Link from 'next/link';
+import { useUser, useFirestore, useDoc } from '@/firebase';
+import { doc } from 'firebase/firestore';
 
 export default function Dashboard() {
-  const [userRole, setUserRole] = useState<'maid' | 'employer'>('employer'); // Toggle for dev preview
+  const { user } = useUser();
+  const db = useFirestore();
   const [isLoading, setIsLoading] = useState(true);
 
+  // In a real app, we'd fetch the actual profile to check user_type
+  const userProfileRef = user ? doc(db, 'users', user.uid) : null;
+  const { data: profile } = useDoc(userProfileRef);
+
   useEffect(() => {
-    // Simulated auth check
-    setTimeout(() => setIsLoading(false), 500);
-  }, []);
+    if (user !== undefined) {
+      setIsLoading(false);
+    }
+  }, [user]);
 
   if (isLoading) return null;
+
+  const isAdmin = profile?.user_type === 'admin';
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -57,6 +69,11 @@ export default function Dashboard() {
           <Link href="/profile" className="flex items-center gap-3 p-3 rounded-xl text-muted-foreground hover:bg-slate-50 transition-colors">
             <User className="w-5 h-5" /> My Profile
           </Link>
+          {isAdmin && (
+            <Link href="/admin" className="flex items-center gap-3 p-3 rounded-xl text-red-600 bg-red-50 hover:bg-red-100 transition-colors font-medium">
+              <ShieldAlert className="w-5 h-5" /> Admin Panel
+            </Link>
+          )}
         </nav>
         <div className="p-4 border-t border-border space-y-2">
           <Link href="/settings" className="flex items-center gap-3 p-3 rounded-xl text-muted-foreground hover:bg-slate-50 transition-colors">
@@ -72,7 +89,7 @@ export default function Dashboard() {
       <main className="flex-1 p-6 md:p-10 overflow-y-auto">
         <header className="flex justify-between items-center mb-10">
           <div>
-            <h1 className="text-3xl font-bold">Welcome back, Sarah! 👋</h1>
+            <h1 className="text-3xl font-bold">Welcome back, {user?.displayName || 'User'}! 👋</h1>
             <p className="text-muted-foreground">Here's what's happening today.</p>
           </div>
           <div className="flex items-center gap-4">
@@ -80,7 +97,7 @@ export default function Dashboard() {
                <Menu />
              </Button>
              <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-md">
-               <img src="https://picsum.photos/seed/user123/48/48" alt="Profile" />
+               <img src={user?.photoURL || "https://picsum.photos/seed/user123/48/48"} alt="Profile" />
              </div>
           </div>
         </header>
@@ -151,7 +168,7 @@ export default function Dashboard() {
                     <div className="p-6 flex-1">
                       <div className="flex justify-between items-start mb-2">
                         <div>
-                          <h3 className="font-bold text-lg">{userRole === 'employer' ? "Namubiru Mary" : "Nalule House Cleaning"}</h3>
+                          <h3 className="font-bold text-lg">{profile?.user_type === 'employer' ? "Namubiru Mary" : "Nalule House Cleaning"}</h3>
                           <p className="text-sm text-muted-foreground flex items-center gap-1">
                             <MapIcon className="w-3 h-3" /> Kampala, Makindye
                           </p>
