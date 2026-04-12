@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   Users, 
   Calendar, 
@@ -13,7 +13,9 @@ import {
   MoreHorizontal,
   Search,
   Filter,
-  Loader2
+  Loader2,
+  UserPlus,
+  Save
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,22 +30,77 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useCollection, useFirestore } from '@/firebase';
-import { collection, query, limit, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, limit, doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { useToast } from '@/hooks/use-toast';
+
+const addUserSchema = z.object({
+  full_name: z.string().min(2, "Name is too short"),
+  email: z.string().email("Invalid email"),
+  user_type: z.enum(["maid", "employer"]),
+  district: z.string().min(2, "District is required"),
+  bio: z.string().optional(),
+  hourly_rate: z.coerce.number().min(0).optional(),
+});
+
+type AddUserValues = z.infer<typeof addUserSchema>;
 
 export default function AdminDashboard() {
   const db = useFirestore();
+  const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Memoized Queries
-  const usersQuery = useMemo(() => db ? query(collection(db, 'users'), limit(20)) : null, [db]);
+  const usersQuery = useMemo(() => db ? query(collection(db, 'users'), limit(50)) : null, [db]);
   const reportsQuery = useMemo(() => db ? query(collection(db, 'reports'), limit(10)) : null, [db]);
   const bookingsQuery = useMemo(() => db ? query(collection(db, 'bookings'), limit(20)) : null, [db]);
 
   const { data: users, loading: loadingUsers } = useCollection(usersQuery);
   const { data: reports, loading: loadingReports } = useCollection(reportsQuery);
   const { data: bookings, loading: loadingBookings } = useCollection(bookingsQuery);
+
+  const form = useForm<AddUserValues>({
+    resolver: zodResolver(addUserSchema),
+    defaultValues: {
+      full_name: "",
+      email: "",
+      user_type: "maid",
+      district: "",
+      bio: "",
+      hourly_rate: 0,
+    },
+  });
 
   const handleResolveReport = (reportId: string) => {
     if (!db) return;
@@ -73,6 +130,43 @@ export default function AdminDashboard() {
       });
   };
 
+  const onAddUserSubmit = async (values: AddUserValues) => {
+    if (!db) return;
+    setIsSubmitting(true);
+
+    const newUserRef = doc(collection(db, 'users'));
+    const userData = {
+      ...values,
+      is_verified: true, // Admin-added users are verified by default
+      created_at: serverTimestamp(),
+      avatar_url: `https://picsum.photos/seed/${newUserRef.id}/200/200`,
+      rating: 0,
+      review_count: 0,
+      skills: [],
+      languages: [],
+    };
+
+    setDoc(newUserRef, userData)
+      .then(() => {
+        setIsSubmitting(false);
+        setIsDialogOpen(false);
+        form.reset();
+        toast({
+          title: "User Added",
+          description: `${values.full_name} has been successfully added as a ${values.user_type}.`,
+        });
+      })
+      .catch(async () => {
+        setIsSubmitting(false);
+        const permissionError = new FirestorePermissionError({
+          path: newUserRef.path,
+          operation: 'create',
+          requestResourceData: userData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
+  };
+
   if (loadingUsers || loadingReports || loadingBookings) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -91,8 +185,122 @@ export default function AdminDashboard() {
           <p className="text-slate-400">Platform Overview & Management Control Panel</p>
         </div>
         <div className="flex gap-4">
+           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+             <DialogTrigger asChild>
+               <Button className="bg-primary hover:bg-primary/90">
+                 <UserPlus className="mr-2 w-4 h-4" /> Add User
+               </Button>
+             </DialogTrigger>
+             <DialogContent className="sm:max-w-[500px] bg-slate-800 border-slate-700 text-white">
+               <DialogHeader>
+                 <DialogTitle>Add New User</DialogTitle>
+                 <DialogDescription className="text-slate-400">
+                   Create a new profile manually. Verified status will be applied automatically.
+                 </DialogDescription>
+               </DialogHeader>
+               <Form {...form}>
+                 <form onSubmit={form.handleSubmit(onAddUserSubmit)} className="space-y-4 py-4">
+                   <FormField
+                     control={form.control}
+                     name="full_name"
+                     render={({ field }) => (
+                       <FormItem>
+                         <FormLabel>Full Name</FormLabel>
+                         <FormControl>
+                           <Input placeholder="Enter full name" {...field} className="bg-slate-900 border-slate-700" />
+                         </FormControl>
+                         <FormMessage />
+                       </FormItem>
+                     )}
+                   />
+                   <div className="grid grid-cols-2 gap-4">
+                     <FormField
+                       control={form.control}
+                       name="email"
+                       render={({ field }) => (
+                         <FormItem>
+                           <FormLabel>Email</FormLabel>
+                           <FormControl>
+                             <Input placeholder="email@example.com" {...field} className="bg-slate-900 border-slate-700" />
+                           </FormControl>
+                           <FormMessage />
+                         </FormItem>
+                       )}
+                     />
+                     <FormField
+                       control={form.control}
+                       name="user_type"
+                       render={({ field }) => (
+                         <FormItem>
+                           <FormLabel>Role</FormLabel>
+                           <Select onValueChange={field.onChange} defaultValue={field.value}>
+                             <FormControl>
+                               <SelectTrigger className="bg-slate-900 border-slate-700">
+                                 <SelectValue placeholder="Select role" />
+                               </SelectTrigger>
+                             </FormControl>
+                             <SelectContent className="bg-slate-800 border-slate-700 text-white">
+                               <SelectItem value="maid">Maid</SelectItem>
+                               <SelectItem value="employer">Employer</SelectItem>
+                             </SelectContent>
+                           </Select>
+                           <FormMessage />
+                         </FormItem>
+                       )}
+                     />
+                   </div>
+                   <div className="grid grid-cols-2 gap-4">
+                     <FormField
+                       control={form.control}
+                       name="district"
+                       render={({ field }) => (
+                         <FormItem>
+                           <FormLabel>District</FormLabel>
+                           <FormControl>
+                             <Input placeholder="e.g. Kampala" {...field} className="bg-slate-900 border-slate-700" />
+                           </FormControl>
+                           <FormMessage />
+                         </FormItem>
+                       )}
+                     />
+                     <FormField
+                       control={form.control}
+                       name="hourly_rate"
+                       render={({ field }) => (
+                         <FormItem>
+                           <FormLabel>Hourly Rate (UGX)</FormLabel>
+                           <FormControl>
+                             <Input type="number" {...field} className="bg-slate-900 border-slate-700" />
+                           </FormControl>
+                           <FormMessage />
+                         </FormItem>
+                       )}
+                     />
+                   </div>
+                   <FormField
+                     control={form.control}
+                     name="bio"
+                     render={({ field }) => (
+                       <FormItem>
+                         <FormLabel>Bio</FormLabel>
+                         <FormControl>
+                           <Textarea placeholder="Professional background..." {...field} className="bg-slate-900 border-slate-700 min-h-[100px]" />
+                         </FormControl>
+                         <FormMessage />
+                       </FormItem>
+                     )}
+                   />
+                   <DialogFooter className="mt-6">
+                     <Button type="submit" className="w-full" disabled={isSubmitting}>
+                       {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                       Create Profile
+                     </Button>
+                   </DialogFooter>
+                 </form>
+               </Form>
+             </DialogContent>
+           </Dialog>
            <Button variant="outline" className="bg-slate-800 border-slate-700 hover:bg-slate-700">Export CSV</Button>
-           <Button className="bg-primary hover:bg-primary/90">System Logs</Button>
         </div>
       </header>
 
