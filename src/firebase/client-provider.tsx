@@ -1,8 +1,7 @@
-
 'use client';
 
 import React, { useMemo } from 'react';
-import { initializeFirebase } from './index';
+import { initializeFirebase } from './app';
 import { FirebaseProvider } from './provider';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
