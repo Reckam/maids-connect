@@ -20,9 +20,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
+import { useAuth, useFirestore } from '@/firebase';
 
 const registerSchema = z.object({
   full_name: z.string().min(2, { message: "Name is too short" }),
@@ -50,32 +50,26 @@ function RegisterForm() {
   });
 
   async function onSubmit(values: z.infer<typeof registerSchema>) {
+    if (!auth || !db) return;
     setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
-      await updateProfile(user, {
-        displayName: values.full_name,
-      });
+      await updateProfile(user, { displayName: values.full_name });
 
-      // Create profile in Firestore
       await setDoc(doc(db, 'users', user.uid), {
         full_name: values.full_name,
         email: values.email,
         user_type: role,
-        is_verified: role === 'employer', // Employers are verified by default for simplicity
-        created_at: serverTimestamp(),
+        is_verified: false,
+        created_at: new Date().toISOString(),
         avatar_url: `https://picsum.photos/seed/${user.uid}/200/200`,
-        rating: 0,
-        review_count: 0,
-        skills: [],
-        languages: [],
       });
 
       toast({
         title: "Account Created",
-        description: `Welcome to Maids Connect! Profile: ${role}`,
+        description: `Welcome to Maids Connect! Your account has been created as a ${role}.`,
       });
       router.push('/dashboard');
     } catch (error: any) {

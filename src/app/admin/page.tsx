@@ -16,7 +16,8 @@ import {
   Loader2,
   UserPlus,
   Save,
-  ShieldCheck
+  ShieldCheck,
+  ArrowLeft
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,6 +65,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 const addUserSchema = z.object({
   full_name: z.string().min(2, "Name is too short"),
@@ -79,6 +81,7 @@ type AddUserValues = z.infer<typeof addUserSchema>;
 export default function AdminDashboard() {
   const db = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -185,6 +188,10 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6 md:p-10">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+        <Button variant="outline" size="icon" className="bg-slate-800 border-slate-700 hover:bg-slate-700"
+            onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <ShieldAlert className="text-primary w-8 h-8" /> Admin Dashboard

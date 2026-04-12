@@ -19,8 +19,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import { useAuth } from '@/firebase';
 import { useRouter } from 'next/navigation';
 
 const loginSchema = z.object({
@@ -44,6 +44,7 @@ export default function LoginPage() {
   });
 
   async function onSubmit(values: z.infer<typeof loginSchema>) {
+    if (!auth) return;
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);

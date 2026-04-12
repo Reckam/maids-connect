@@ -1,21 +1,43 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, MapPin, User, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, ChevronRight, Loader2, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-
-const BOOKINGS = [
-  { id: '1', role: 'maid', client: 'Sarah K.', status: 'pending', date: '2023-11-05', time: '09:00', duration: 4, price: 60000, services: ['Cleaning'] },
-  { id: '2', role: 'maid', client: 'James M.', status: 'confirmed', date: '2023-11-06', time: '14:00', duration: 3, price: 45000, services: ['Cooking'] },
-  { id: '3', role: 'maid', client: 'Namuli P.', status: 'completed', date: '2023-10-20', time: '10:00', duration: 8, price: 120000, services: ['Babysitting'] },
-  { id: '4', role: 'maid', client: 'Okello D.', status: 'cancelled', date: '2023-10-15', time: '08:00', duration: 4, price: 60000, services: ['Cleaning'] },
-];
+import { useUser } from '@/supabase/auth/use-user';
+import { createClient } from '@/supabase/client';
+import { useRouter } from 'next/navigation';
 
 export default function BookingsPage() {
+  const user = useUser();
+  const supabase = createClient();
+  const router = useRouter();
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchBookings = async () => {
+      if (!user) return;
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('bookings')
+          .select('*, client:client_id(*), maid:maid_id(*)')
+          // .or(`client_id.eq.${user.id},maid_id.eq.${user.id}`)
+        if (error) throw error;
+        setBookings(data || []);
+      } catch (error) {
+        console.error("Error fetching bookings:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchBookings();
+  }, [user, supabase]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed': return 'bg-green-100 text-green-700';
@@ -27,7 +49,11 @@ export default function BookingsPage() {
   };
 
   const BookingList = ({ status }: { status?: string }) => {
-    const filtered = status ? BOOKINGS.filter(b => b.status === status) : BOOKINGS;
+    const filtered = status ? bookings.filter(b => b.status === status) : bookings;
+
+    if (isLoading) {
+        return <div className='grid place-content-center h-40'><Loader2 className='animate-spin'/></div>
+    }
 
     if (filtered.length === 0) {
       return (
@@ -51,9 +77,9 @@ export default function BookingsPage() {
                       <User className="text-primary w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="font-bold">{booking.client}</h3>
+                      <h3 className="font-bold">{booking.client?.full_name || 'N/A'}</h3>
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <MapPin className="w-3 h-3" /> Kampala, Central
+                        <MapPin className="w-3 h-3" /> {booking.client?.district || 'N/A'}
                       </p>
                     </div>
                   </div>
@@ -65,21 +91,21 @@ export default function BookingsPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4 border-y border-slate-50">
                   <div className="space-y-1">
                     <p className="text-[10px] text-muted-foreground uppercase">Date</p>
-                    <p className="text-sm font-medium flex items-center gap-1"><Calendar className="w-3 h-3" /> {booking.date}</p>
+                    <p className="text-sm font-medium flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(booking.booking_date).toLocaleDateString()}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-[10px] text-muted-foreground uppercase">Time</p>
-                    <p className="text-sm font-medium flex items-center gap-1"><Clock className="w-3 h-3" /> {booking.time}</p>
+                    <p className="text-sm font-medium flex items-center gap-1"><Clock className="w-3 h-3" /> {booking.booking_time}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-[10px] text-muted-foreground uppercase">Services</p>
                     <div className="flex flex-wrap gap-1">
-                      {booking.services.map(s => <span key={s} className="text-xs font-medium">{s}</span>)}
+                      {booking.services?.map((s: string) => <span key={s} className="text-xs font-medium">{s}</span>)}
                     </div>
                   </div>
                   <div className="space-y-1">
                     <p className="text-[10px] text-muted-foreground uppercase">Total Pay</p>
-                    <p className="text-sm font-bold text-primary">UGX {booking.price.toLocaleString()}</p>
+                    <p className="text-sm font-bold text-primary">UGX {booking.total_price?.toLocaleString()}</p>
                   </div>
                 </div>
 
@@ -108,6 +134,10 @@ export default function BookingsPage() {
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-12">
       <div className="max-w-4xl mx-auto space-y-8">
+        <Button variant="outline" size="icon" className="bg-white border-slate-200 hover:bg-slate-100 shadow-md"
+            onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4" />
+        </Button>
         <div className="flex justify-between items-center">
           <h1 className="text-4xl font-bold tracking-tight">Your Bookings</h1>
           <Link href="/browse">

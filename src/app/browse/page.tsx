@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, MapPin, Star, Filter, ShieldCheck, Grid, List as ListIcon, Loader2 } from 'lucide-react';
+import { Search, MapPin, Star, Filter, ShieldCheck, Grid, List as ListIcon, Loader2, ArrowLeft } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,10 +11,12 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { useCollection, useFirestore } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
+import { useRouter } from 'next/navigation';
 
 export default function BrowsePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const db = useFirestore();
+  const router = useRouter();
 
   // Query only verified maids
   const maidsQuery = useMemo(() => {
@@ -42,6 +44,10 @@ export default function BrowsePage() {
       {/* Search Header */}
       <div className="bg-white border-b border-border py-12 px-6">
         <div className="max-w-7xl mx-auto space-y-8">
+        <Button variant="outline" size="icon" className="bg-slate-100 border-slate-200 hover:bg-slate-200"
+            onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <h1 className="text-4xl font-bold tracking-tight">Find Domestic Help</h1>

@@ -2,10 +2,11 @@
 
 import React from 'react';
 import dynamic from 'next/dynamic';
-import { Shield, ChevronLeft, Search, Loader2 } from 'lucide-react';
+import { Shield, ChevronLeft, Search, Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useRouter } from 'next/navigation';
 
 // Dynamically import the consolidated map component with SSR disabled
 const InteractiveMap = dynamic(
@@ -24,10 +25,15 @@ const InteractiveMap = dynamic(
 );
 
 export default function MapViewPage() {
+  const router = useRouter();
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden relative">
       {/* Map Toolbar - Absolute positioned to stay above the map */}
       <div className="absolute top-4 left-4 right-4 z-[1000] flex flex-col md:flex-row gap-4 items-start md:items-center">
+        <Button variant="outline" size="icon" className="bg-white border-slate-200 hover:bg-slate-100 shadow-md"
+            onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
         <div className="glass-morphism rounded-full p-2 pr-6 flex items-center gap-4 shadow-xl">
           <Link href="/browse">
             <Button size="icon" variant="ghost" className="rounded-full bg-white shadow-sm">

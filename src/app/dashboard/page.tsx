@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Calendar, 
@@ -21,26 +21,34 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
-import { useUser, useFirestore, useDoc } from '@/firebase';
+import { useUser, useDoc, useFirestore, useAuth } from '@/firebase';
 import { doc } from 'firebase/firestore';
+import { useRouter } from 'next/navigation';
+import { signOut } from 'firebase/auth';
 
 export default function Dashboard() {
-  const { user } = useUser();
+  const user = useUser();
   const db = useFirestore();
-  const [isLoading, setIsLoading] = useState(true);
+  const auth = useAuth();
+  const router = useRouter();
 
-  const userProfileRef = user ? doc(db, 'users', user.uid) : null;
-  const { data: profile } = useDoc(userProfileRef);
+  const userDocRef = useMemo(() => (user && db ? doc(db, 'users', user.uid) : null), [user, db]);
+  const { data: profile, loading: isLoading } = useDoc(userDocRef);
 
-  useEffect(() => {
-    if (user !== undefined) {
-      setIsLoading(false);
+  const handleLogout = async () => {
+    if (auth) {
+      await signOut(auth);
+      router.push('/login');
     }
-  }, [user]);
+  };
 
-  if (isLoading) return null;
+  if (isLoading) return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <Loader2 className="animate-spin text-primary w-10 h-10" />
+    </div>
+  );
 
   const isAdmin = profile?.user_type === 'admin';
   const isMaid = profile?.user_type === 'maid';
@@ -79,10 +87,7 @@ export default function Dashboard() {
           )}
         </nav>
         <div className="p-4 border-t border-border space-y-2">
-          <Link href="/settings" className="flex items-center gap-3 p-3 rounded-xl text-muted-foreground hover:bg-slate-50 transition-colors">
-            <Settings className="w-5 h-5" /> Settings
-          </Link>
-          <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10">
+          <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleLogout}>
             <LogOut className="w-5 h-5 mr-3" /> Logout
           </Button>
         </div>
@@ -92,15 +97,12 @@ export default function Dashboard() {
       <main className="flex-1 p-6 md:p-10 overflow-y-auto">
         <header className="flex justify-between items-center mb-10">
           <div>
-            <h1 className="text-3xl font-bold">Welcome back, {profile?.full_name || user?.displayName || 'User'}! 👋</h1>
+            <h1 className="text-3xl font-bold">Welcome back, {profile?.full_name || user?.email || 'User'}! 👋</h1>
             <p className="text-muted-foreground">Here's what's happening today.</p>
           </div>
           <div className="flex items-center gap-4">
-             <Button variant="outline" size="icon" className="lg:hidden">
-               <Menu />
-             </Button>
              <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-md">
-               <img src={profile?.avatar_url || user?.photoURL || "https://picsum.photos/seed/user123/48/48"} alt="Profile" />
+               <img src={profile?.avatar_url || "https://picsum.photos/seed/user123/48/48"} alt="Profile" />
              </div>
           </div>
         </header>
@@ -177,7 +179,6 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Upcoming Section & Quick Links */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <div className="flex justify-between items-center">
@@ -218,19 +219,11 @@ export default function Dashboard() {
                   </Button>
                 </Link>
              </div>
-             
-             <Card className="bg-gradient-to-br from-primary to-secondary text-white border-none shadow-xl overflow-hidden relative">
-               <div className="p-6 relative z-10">
-                 <h3 className="text-xl font-bold mb-2">Platform Tips</h3>
-                 <p className="text-white/80 text-sm">
-                   {isMaid ? "Verified maids get 3x more bookings! Complete your profile today." : "Always review your maid after the service to help others!"}
-                 </p>
-               </div>
-               <div className="absolute -bottom-4 -right-4 bg-white/10 w-24 h-24 rounded-full" />
-             </Card>
           </div>
         </div>
       </main>
     </div>
   );
 }
+
+import { Loader2 } from 'lucide-react';

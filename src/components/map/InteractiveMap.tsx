@@ -8,13 +8,8 @@ import { Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
-/**
- * Standard Leaflet markers are often broken in modern build systems.
- * We define our own icon config to ensure they render correctly.
- */
 const getMarkerIcon = () => {
   if (typeof window === 'undefined') return undefined;
-  
   return L.icon({
     iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
     iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -38,57 +33,47 @@ export default function InteractiveMap() {
   const [isMounted, setIsMounted] = useState(false);
   const [markerIcon, setMarkerIcon] = useState<L.Icon | undefined>(undefined);
   
-  // Using a truly unique session key ensures that during development/hot-reloads,
-  // the map container is always treated as a fresh DOM element, preventing the 
-  // "Map container already initialized" error.
-  const sessionKey = useMemo(() => `map-session-${Date.now()}`, []);
+  // Use a stable but unique session key to force a fresh DOM node for the map container
+  // This effectively resolves the "Map container already initialized" error during hot-reloads
+  const mountKey = useMemo(() => `map-instance-${Math.random().toString(36).substr(2, 9)}`, []);
 
   useEffect(() => {
     setIsMounted(true);
     setMarkerIcon(getMarkerIcon());
-    return () => {
-      setIsMounted(false);
-    };
+    return () => setIsMounted(false);
   }, []);
 
   if (!isMounted || !markerIcon) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-slate-50">
-        <p className="text-muted-foreground font-medium animate-pulse">Initializing Map Instance...</p>
+        <p className="text-muted-foreground font-medium animate-pulse">Loading Map...</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full w-full relative" key={sessionKey}>
+    <div className="h-full w-full relative" key={mountKey}>
       <MapContainer 
         center={[0.3476, 32.5825] as [number, number]} 
         zoom={9} 
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom={true}
-        zoomControl={true}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          attribution='&copy; OpenStreetMap contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         {LOCATIONS.map((loc) => (
-          <Marker 
-            key={loc.id} 
-            position={loc.pos as [number, number]} 
-            icon={markerIcon}
-          >
+          <Marker key={loc.id} position={loc.pos as [number, number]} icon={markerIcon}>
             <Popup>
               <div className="p-2 space-y-2 min-w-[150px]">
                 <div className="font-bold text-sm">{loc.name}</div>
                 <div className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Star className="w-3 h-3 text-yellow-600 fill-yellow-600" /> {loc.rating} Rating
+                  <Star className="w-3 h-3 text-yellow-600 fill-yellow-600" /> {loc.rating}
                 </div>
-                <div className="text-xs">{loc.district}, Uganda</div>
+                <div className="text-xs">{loc.district}</div>
                 <Link href={`/profile/${loc.id}`}>
-                  <Button size="sm" className="w-full mt-2 h-8 text-[10px] rounded-lg bg-primary hover:bg-primary/90">
-                    VIEW PROFILE
-                  </Button>
+                  <Button size="sm" className="w-full mt-2 h-8 text-[10px] rounded-lg">VIEW PROFILE</Button>
                 </Link>
               </div>
             </Popup>
