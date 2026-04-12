@@ -1,19 +1,29 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import { Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
-// Fix for default marker icon in Leaflet + Next.js
-const defaultIcon = L.icon({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
+/**
+ * Standard Leaflet markers are often broken in modern build systems.
+ * We define our own icon config to ensure they render correctly.
+ */
+const getMarkerIcon = () => {
+  if (typeof window === 'undefined') return undefined;
+  
+  return L.icon({
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  });
+};
 
 const LOCATIONS = [
   { id: '1', name: 'Nalule Florence', pos: [0.3476, 32.5825], district: 'Kampala', rating: 4.8 },
@@ -24,12 +34,31 @@ const LOCATIONS = [
 ];
 
 export default function InteractiveMap() {
+  const [isMounted, setIsMounted] = useState(false);
+  const [markerIcon, setMarkerIcon] = useState<L.Icon | undefined>(undefined);
+
+  useEffect(() => {
+    setIsMounted(true);
+    setMarkerIcon(getMarkerIcon());
+  }, []);
+
+  // Prevent initialization errors by only rendering when fully mounted on client
+  if (!isMounted || !markerIcon) {
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-slate-50">
+        <p className="text-muted-foreground font-medium">Initializing Map Layers...</p>
+      </div>
+    );
+  }
+
   return (
     <MapContainer 
-      center={[0.3476, 32.5825]} 
+      center={[0.3476, 32.5825] as [number, number]} 
       zoom={9} 
       style={{ height: '100%', width: '100%' }}
       scrollWheelZoom={true}
+      // A unique key helps React distinguish this instance during HMR
+      key="maids-connect-v1"
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -39,7 +68,7 @@ export default function InteractiveMap() {
         <Marker 
           key={loc.id} 
           position={loc.pos as [number, number]} 
-          icon={defaultIcon}
+          icon={markerIcon}
         >
           <Popup>
             <div className="p-2 space-y-2 min-w-[150px]">
