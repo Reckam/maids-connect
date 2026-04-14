@@ -19,7 +19,8 @@ import {
   Lock,
   ExternalLink,
   PlusCircle,
-  Wrench
+  Wrench,
+  LogOut
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,7 +59,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { useCollection, useFirestore, useUser, useDoc } from '@/firebase';
+import { useCollection, useFirestore, useUser, useDoc, useAuth } from '@/firebase';
 import { collection, query, limit, doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -67,6 +68,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { signOut } from 'firebase/auth';
 
 const addUserSchema = z.object({
   full_name: z.string().min(2, "Name is too short"),
@@ -82,6 +84,7 @@ type AddUserValues = z.infer<typeof addUserSchema>;
 export default function AdminDashboard() {
   const { user } = useUser();
   const db = useFirestore();
+  const auth = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -111,6 +114,13 @@ export default function AdminDashboard() {
       hourly_rate: 0,
     },
   });
+
+  const handleLogout = async () => {
+    if (auth) {
+      await signOut(auth);
+      router.push('/login');
+    }
+  };
 
   const handleRepairPermissions = async () => {
     if (!db || !user) return;
@@ -299,16 +309,25 @@ export default function AdminDashboard() {
                }}>{user?.uid}</code>
             </div>
             
-            {isMasterAdmin && (
-               <Button 
-                className="w-full bg-primary hover:bg-primary/90 rounded-full" 
-                onClick={handleRepairPermissions}
-                disabled={isRepairing}
-               >
-                 {isRepairing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wrench className="mr-2 h-4 w-4" />}
-                 Repair My Admin Account
-               </Button>
-            )}
+            <div className="flex flex-col gap-3">
+              {isMasterAdmin && (
+                 <Button 
+                  className="w-full bg-primary hover:bg-primary/90 rounded-full" 
+                  onClick={handleRepairPermissions}
+                  disabled={isRepairing}
+                 >
+                   {isRepairing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wrench className="mr-2 h-4 w-4" />}
+                   Repair My Admin Account
+                 </Button>
+              )}
+              
+              <Button className="w-full rounded-full" variant="outline" onClick={() => router.push('/dashboard')}>
+                Return to Dashboard
+              </Button>
+              <Button variant="ghost" className="text-destructive hover:bg-destructive/10 rounded-full" onClick={handleLogout}>
+                <LogOut className="w-4 h-4 mr-2" /> Logout & Switch Account
+              </Button>
+            </div>
 
             <div className="text-left text-xs text-slate-400 space-y-2 leading-relaxed pt-4 border-t border-slate-800">
               <p>Alternatively, manually set your role in the console:</p>
@@ -318,9 +337,6 @@ export default function AdminDashboard() {
                 <li>Change <b>user_type</b> to <b>"admin"</b>.</li>
               </ol>
             </div>
-            <Button className="w-full rounded-full" variant="outline" onClick={() => router.push('/dashboard')}>
-              Return to Dashboard
-            </Button>
           </CardContent>
         </Card>
       </div>
@@ -344,6 +360,10 @@ export default function AdminDashboard() {
         </div>
         
         <div className="flex gap-3">
+          <Button variant="ghost" className="text-destructive hover:bg-destructive/10 rounded-full" onClick={handleLogout}>
+            <LogOut className="w-4 h-4 mr-2" /> Logout
+          </Button>
+          
           <Button 
             variant="outline" 
             className="border-slate-800 bg-slate-900 text-slate-400 hover:text-white rounded-full"

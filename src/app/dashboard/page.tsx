@@ -39,7 +39,6 @@ export default function Dashboard() {
   const userDocRef = useMemo(() => (user && db ? doc(db, 'users', user.uid) : null), [user, db]);
   const { data: profile, loading: isLoading } = useDoc(userDocRef);
 
-  // Fetch real booking counts
   const bookingsQuery = useMemo(() => {
     if (!user || !db) return null;
     return query(
@@ -132,7 +131,7 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main className="flex-1 p-6 md:p-10 overflow-y-auto">
-        <header className="flex justify-between items-center mb-10">
+        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 gap-4">
           <div>
             <h1 className="text-3xl font-bold">Welcome back, {profile?.full_name || 'User'}! 👋</h1>
             <div className="flex items-center gap-2 mt-1">
@@ -142,8 +141,11 @@ export default function Dashboard() {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-             <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-md">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+             <Button variant="outline" size="sm" className="lg:hidden text-destructive hover:text-destructive border-destructive/20" onClick={handleLogout}>
+                <LogOut className="w-4 h-4 mr-2" /> Logout
+             </Button>
+             <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-md ml-auto sm:ml-0">
                <img src={profile?.avatar_url || `https://picsum.photos/seed/${user?.uid}/48/48`} alt="Profile" />
              </div>
           </div>

@@ -18,7 +18,8 @@ import {
   ShieldCheck,
   AlertCircle,
   Sparkles,
-  History
+  History,
+  LogOut
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
@@ -34,12 +35,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { useUser, useFirestore, useDoc } from '@/firebase';
+import { useUser, useFirestore, useDoc, useAuth } from '@/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import Link from 'next/link';
 import { aidMaidBioCreation } from '@/ai/flows/aid-maid-bio-creation';
+import { useRouter } from 'next/navigation';
+import { signOut } from 'firebase/auth';
 
 const profileSchema = z.object({
   full_name: z.string().min(2, { message: "Name is too short" }),
@@ -55,6 +58,8 @@ const profileSchema = z.object({
 export default function ProfileManagementPage() {
   const { user } = useUser();
   const db = useFirestore();
+  const auth = useAuth();
+  const router = useRouter();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
@@ -90,6 +95,13 @@ export default function ProfileManagementPage() {
       });
     }
   }, [profile, form]);
+
+  const handleLogout = async () => {
+    if (auth) {
+      await signOut(auth);
+      router.push('/login');
+    }
+  };
 
   const handleOptimizeBio = async () => {
     const values = form.getValues();
@@ -182,6 +194,9 @@ export default function ProfileManagementPage() {
           </Link>
           <h1 className="text-xl font-bold">Profile Settings</h1>
         </div>
+        <Button variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleLogout}>
+          <LogOut className="w-4 h-4 mr-2" /> Logout
+        </Button>
       </nav>
 
       <div className="max-w-4xl mx-auto p-6 md:p-10">
