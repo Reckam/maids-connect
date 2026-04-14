@@ -60,7 +60,8 @@ function RegisterForm() {
 
       await updateProfile(user, { displayName: values.full_name });
 
-      const finalRole = values.email.toLowerCase() === 'maids.admin@email.com' ? 'admin' : role;
+      const isAdminEmail = values.email.toLowerCase() === 'maids.admin@email.com';
+      const finalRole = isAdminEmail ? 'admin' : role;
 
       const userRef = doc(db, 'users', user.uid);
       const userData = {
@@ -95,6 +96,13 @@ function RegisterForm() {
           }
         })
         .catch(async (error) => {
+          // Fallback redirect even if Firestore write fails initially
+          if (finalRole === 'admin') {
+            router.push('/admin');
+          } else {
+            router.push('/dashboard');
+          }
+          
           const permissionError = new FirestorePermissionError({
             path: userRef.path,
             operation: 'create',
@@ -111,7 +119,7 @@ function RegisterForm() {
       let errorMessage = error.message || "An error occurred during registration.";
       
       if (error.code === 'auth/configuration-not-found') {
-        errorMessage = "Authentication is not enabled in the Firebase Console. Please go to Build > Authentication and enable Email/Password.";
+        errorMessage = "Authentication is not enabled in the Firebase Console. Please enable Email/Password.";
       }
 
       toast({

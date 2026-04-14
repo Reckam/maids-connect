@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -18,7 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, User } from 'firebase/auth';
 import { useAuth, useFirestore } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -47,9 +48,19 @@ export default function LoginPage() {
     },
   });
 
-  async function handleRedirectByRole(uid: string) {
-    if (!db) return;
-    const userRef = doc(db, 'users', uid);
+  async function handleRedirect(user: User) {
+    // Priority 1: Hardcoded Admin Email Check
+    if (user.email?.toLowerCase() === 'maids.admin@email.com') {
+      router.push('/admin');
+      return;
+    }
+
+    if (!db) {
+      router.push('/dashboard');
+      return;
+    }
+
+    const userRef = doc(db, 'users', user.uid);
     try {
       const userSnap = await getDoc(userRef);
       if (userSnap.exists()) {
@@ -60,11 +71,10 @@ export default function LoginPage() {
           router.push('/dashboard');
         }
       } else {
-        // Fallback for new users without a profile document
         router.push('/dashboard');
       }
     } catch (e) {
-      // Silently handle read errors during redirect; the dashboard will handle its own state
+      // If we can't read the profile, default to standard dashboard
       router.push('/dashboard');
     }
   }
@@ -81,7 +91,9 @@ export default function LoginPage() {
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
-        const finalRole = user.email?.toLowerCase() === 'maids.admin@email.com' ? 'admin' : 'employer';
+        const isAdminEmail = user.email?.toLowerCase() === 'maids.admin@email.com';
+        const finalRole = isAdminEmail ? 'admin' : 'employer';
+        
         const userData = {
           full_name: user.displayName || 'Google User',
           email: user.email,
@@ -101,14 +113,10 @@ export default function LoginPage() {
         };
 
         setDoc(userRef, userData)
-          .then(() => {
-            if (finalRole === 'admin') {
-              router.push('/admin');
-            } else {
-              router.push('/dashboard');
-            }
-          })
+          .then(() => handleRedirect(user))
           .catch(async () => {
+            // Even if DB write fails, try to redirect based on email
+            handleRedirect(user);
             errorEmitter.emit('permission-error', new FirestorePermissionError({
               path: userRef.path,
               operation: 'create',
@@ -116,7 +124,7 @@ export default function LoginPage() {
             }));
           });
       } else {
-        await handleRedirectByRole(user.uid);
+        await handleRedirect(user);
       }
 
       toast({
@@ -143,7 +151,7 @@ export default function LoginPage() {
         title: "Login Successful",
         description: "Welcome back!",
       });
-      await handleRedirectByRole(userCredential.user.uid);
+      await handleRedirect(userCredential.user);
     } catch (error: any) {
       toast({
         variant: "destructive",
