@@ -68,7 +68,7 @@ type ProfileData = {
 };
 
 export default function ProfileManagementPage() {
-  const [supabase] = useState(() => createClient());
+  const supabase = createClient();
   const router = useRouter();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
