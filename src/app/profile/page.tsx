@@ -39,6 +39,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { Badge } from "@/components/ui/badge";
+import { aidMaidBioCreation } from '@/ai/flows/aid-maid-bio-creation';
 
 const profileSchema = z.object({
   full_name: z.string().min(2, { message: "Name is too short" }),
@@ -53,6 +54,7 @@ const profileSchema = z.object({
 });
 
 type ProfileData = {
+  id: string;
   full_name: string;
   district: string;
   user_type: 'maid' | 'employer' | 'admin';
@@ -114,16 +116,11 @@ export default function ProfileManagementPage() {
         .select('*')
         .eq('id', authUser.id)
         .single();
-      if (maidError) console.error("Could not fetch maid details", maidError);
-      else Object.assign(profileData, maidData);
-    } else if (userData.user_type === 'employer') {
-      const { data: employerData, error: employerError } = await supabase
-        .from('employers')
-        .select('*')
-        .eq('id', authUser.id)
-        .single();
-      if (employerError) console.error("Could not fetch employer details", employerError);
-      else Object.assign(profileData, employerData);
+      if (maidError && maidError.code !== 'PGRST116') {
+        console.error("Could not fetch maid details", maidError);
+      } else if (maidData) {
+        Object.assign(profileData, maidData);
+      }
     }
     
     setProfile(profileData);
@@ -161,6 +158,31 @@ export default function ProfileManagementPage() {
     router.push('/login');
   };
 
+  const handleAIBioOptimize = async () => {
+    const values = form.getValues();
+    if (!values.skills) {
+      toast({ title: "More info needed", description: "Please add some skills before optimizing." });
+      return;
+    }
+
+    setIsOptimizing(true);
+    try {
+      const result = await aidMaidBioCreation({
+        skills: values.skills.split(',').map(s => s.trim()),
+        experience: values.experience || 0,
+        currentBio: values.bio
+      });
+      
+      form.setValue('bio', result.generatedBio);
+      toast({ title: "Bio Optimized", description: "Your bio has been professionally rewritten by AI." });
+    } catch (error) {
+      console.error(error);
+      toast({ variant: "destructive", title: "AI Error", description: "Failed to optimize bio. Please try again." });
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
   async function onSubmit(values: z.infer<typeof profileSchema>) {
     if (!user) return;
     setIsSaving(true);
@@ -180,11 +202,20 @@ export default function ProfileManagementPage() {
 
     let profileError;
     if (user_type === 'maid') {
-      const { error } = await supabase.from('maids').update({
-        ...rest,
+      const maidData = {
+        bio: values.bio,
+        hourly_rate: values.hourly_rate,
+        experience: values.experience,
         skills: values.skills?.split(",").map(s => s.trim()).filter(s => s !== ""),
         languages: values.languages?.split(",").map(l => l.trim()).filter(l => l !== ""),
-      }).eq('id', user.id);
+        availability: values.availability,
+      };
+
+      // Upsert to maids table
+      const { error } = await supabase.from('maids').upsert({
+        id: user.id,
+        ...maidData
+      });
       profileError = error;
     }
 
@@ -197,7 +228,7 @@ export default function ProfileManagementPage() {
         title: "Profile Updated",
         description: "Your changes have been saved successfully.",
       });
-      fetchProfile(user); // Re-fetch to show updated data
+      fetchProfile(user);
     }
   }
 
@@ -233,7 +264,7 @@ export default function ProfileManagementPage() {
             <Card className="border-none shadow-md overflow-hidden">
               <div className="bg-primary/10 p-10 flex flex-col items-center">
                 <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden bg-white mb-4">
-                  <img src={profile?.avatar_url || `https://i.pravatar.cc/150?u=${user?.id}`} alt="" />
+                  <img src={profile?.avatar_url || `https://picsum.photos/seed/${user?.id}/150/150`} alt="" />
                 </div>
                 <h2 className="font-bold text-lg">{profile?.full_name}</h2>
                 <Badge className="mt-2 capitalize">{profile?.user_type}</Badge>
@@ -353,19 +384,17 @@ export default function ProfileManagementPage() {
                           <FormItem>
                             <div className="flex justify-between items-center mb-2">
                                <FormLabel>Professional Bio</FormLabel>
-                               {isMaid && (
-                                 <Button 
-                                   type="button" 
-                                   variant="ghost" 
-                                   size="sm" 
-                                   className="text-primary gap-1 h-7"
-                                   onClick={() => {}}
-                                   disabled={isOptimizing}
-                                 >
-                                   {isOptimizing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                                   AI Optimize
-                                 </Button>
-                               )}
+                               <Button 
+                                 type="button" 
+                                 variant="ghost" 
+                                 size="sm" 
+                                 className="text-primary gap-1 h-7"
+                                 onClick={handleAIBioOptimize}
+                                 disabled={isOptimizing}
+                               >
+                                 {isOptimizing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                 AI Optimize
+                               </Button>
                             </div>
                             <FormControl>
                               <Textarea {...field} placeholder="Describe your experience and what makes you a great choice..." className="min-h-[120px]" />
