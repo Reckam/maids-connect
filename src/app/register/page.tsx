@@ -20,11 +20,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { useAuth, useFirestore } from '@/firebase';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 
 const registerSchema = z.object({
   full_name: z.string().min(2, { message: "Name is too short" }),
@@ -33,8 +28,6 @@ const registerSchema = z.object({
 });
 
 function RegisterForm() {
-  const auth = useAuth();
-  const db = useFirestore();
   const router = useRouter();
   const searchParams = useSearchParams();
   const role = searchParams.get('role') || 'employer';
@@ -52,82 +45,20 @@ function RegisterForm() {
   });
 
   async function onSubmit(values: z.infer<typeof registerSchema>) {
-    if (!auth || !db) return;
     setIsLoading(true);
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-      const user = userCredential.user;
-
-      await updateProfile(user, { displayName: values.full_name });
-
-      const isAdminEmail = values.email.toLowerCase() === 'maids.admin@email.com';
-      const finalRole = isAdminEmail ? 'admin' : role;
-
-      const userRef = doc(db, 'users', user.uid);
-      const userData = {
-        full_name: values.full_name,
-        email: values.email,
-        user_type: finalRole,
-        is_verified: finalRole === 'admin',
-        created_at: serverTimestamp(),
-        avatar_url: `https://picsum.photos/seed/${user.uid}/200/200`,
-        district: "",
-        bio: "",
-        hourly_rate: 0,
-        skills: [],
-        languages: [],
-        availability: "",
-        rating: 0,
-        review_count: 0,
-        experience: 0
-      };
-
-      setDoc(userRef, userData)
-        .then(() => {
-          toast({
-            title: "Account Created",
-            description: `Welcome! Your account has been created as an ${finalRole}.`,
-          });
-          
-          if (finalRole === 'admin') {
-            router.push('/admin');
-          } else {
-            router.push('/dashboard');
-          }
-        })
-        .catch(async (error) => {
-          // Fallback redirect even if Firestore write fails initially
-          if (finalRole === 'admin') {
-            router.push('/admin');
-          } else {
-            router.push('/dashboard');
-          }
-          
-          const permissionError = new FirestorePermissionError({
-            path: userRef.path,
-            operation: 'create',
-            requestResourceData: userData,
-          });
-          errorEmitter.emit('permission-error', permissionError);
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-
-    } catch (error: any) {
+    // Mock registration
+    setTimeout(() => {
       setIsLoading(false);
-      let errorMessage = error.message || "An error occurred during registration.";
-      
-      if (error.code === 'auth/configuration-not-found') {
-        errorMessage = "Authentication is not enabled in the Firebase Console. Please enable Email/Password.";
-      }
-
       toast({
-        variant: "destructive",
-        title: "Registration Failed",
-        description: errorMessage,
+        title: "Account Created",
+        description: `Welcome! Your account has been created as an ${role}.`,
       });
-    }
+      if (values.email === 'maids.admin@email.com') {
+        router.push('/admin');
+      } else {
+        router.push('/dashboard');
+      }
+    }, 1000);
   }
 
   return (
@@ -172,7 +103,7 @@ function RegisterForm() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="maids.admin@email.com" {...field} className="h-11" />
+                        <Input placeholder="user@email.com" {...field} className="h-11" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

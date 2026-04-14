@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import { FirebaseClientProvider } from '@/firebase';
 
 export const metadata: Metadata = {
   title: 'Maids Connect | Domestic Workers Platform Uganda',
@@ -24,10 +23,8 @@ export default function RootLayout({
           crossOrigin="" />
       </head>
       <body className="font-body antialiased min-h-screen bg-background">
-        <FirebaseClientProvider>
           {children}
           <Toaster />
-        </FirebaseClientProvider>
       </body>
     </html>
   );

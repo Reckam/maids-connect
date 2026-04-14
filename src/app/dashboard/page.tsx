@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { 
   Calendar, 
@@ -15,68 +15,36 @@ import {
   LogOut,
   ShieldCheck,
   ShieldAlert,
-  AlertTriangle,
   ChevronRight,
-  Loader2,
-  Mail,
-  Plus
+  Mail
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { useUser, useDoc, useFirestore, useAuth, useCollection } from '@/firebase';
-import { doc, collection, query, where, or, limit, orderBy } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
-import { signOut } from 'firebase/auth';
 
 export default function Dashboard() {
-  const { user, loading: authLoading } = useUser();
-  const db = useFirestore();
-  const auth = useAuth();
   const router = useRouter();
 
-  const userDocRef = useMemo(() => (user && db ? doc(db, 'users', user.uid) : null), [user, db]);
-  const { data: profile, loading: isLoading } = useDoc(userDocRef);
-
-  const bookingsQuery = useMemo(() => {
-    if (!user || !db) return null;
-    return query(
-      collection(db, 'bookings'),
-      or(
-        where('employer_id', '==', user.uid),
-        where('maid_id', '==', user.uid)
-      )
-    );
-  }, [user, db]);
-
-  const { data: bookings } = useCollection(bookingsQuery);
-
-  const stats = useMemo(() => {
-    if (!bookings) return { pending: 0, completed: 0, scheduled: 0 };
-    return {
-      pending: bookings.filter(b => b.status === 'pending').length,
-      completed: bookings.filter(b => b.status === 'completed').length,
-      confirmed: bookings.filter(b => b.status === 'confirmed').length,
-    };
-  }, [bookings]);
-
-  const handleLogout = async () => {
-    if (auth) {
-      await signOut(auth);
-      router.push('/login');
-    }
+  // Mock data for display
+  const profile = {
+    full_name: "Demo User",
+    user_type: "employer",
+    email: "demo@example.com",
+    rating: 4.8,
+    is_verified: true,
+    avatar_url: "https://picsum.photos/seed/demo/48/48"
   };
 
-  if (authLoading || isLoading) return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-      <Loader2 className="animate-spin text-primary w-10 h-10" />
-    </div>
-  );
+  const bookings = [
+    { id: '1', date: '2024-05-20', time: '09:00', status: 'pending' },
+    { id: '2', date: '2024-05-21', time: '14:00', status: 'confirmed' },
+  ];
 
-  const isAdmin = profile?.user_type === 'admin';
-  const isMaid = profile?.user_type === 'maid';
-  const isVerified = profile?.is_verified === true;
+  const handleLogout = () => {
+    router.push('/login');
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -104,25 +72,8 @@ export default function Dashboard() {
           <Link href="/profile" className="flex items-center gap-3 p-3 rounded-xl text-muted-foreground hover:bg-slate-50 transition-colors">
             <User className="w-5 h-5" /> My Profile
           </Link>
-          {isAdmin && (
-            <Link href="/admin" className="flex items-center gap-3 p-3 rounded-xl text-red-600 bg-red-50 hover:bg-red-100 transition-colors font-medium">
-              <ShieldAlert className="w-5 h-5" /> Admin Panel
-            </Link>
-          )}
         </nav>
         <div className="p-4 border-t border-border space-y-4">
-          <div className="px-3">
-             <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-2">Signed in as</p>
-             <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-100">
-                  <img src={profile?.avatar_url || `https://picsum.photos/seed/${user?.uid}/24/24`} alt="" />
-                </div>
-                <div className="flex-1 overflow-hidden">
-                   <p className="text-xs font-bold truncate">{profile?.full_name}</p>
-                   <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
-                </div>
-             </div>
-          </div>
           <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleLogout}>
             <LogOut className="w-5 h-5 mr-3" /> Logout
           </Button>
@@ -133,47 +84,23 @@ export default function Dashboard() {
       <main className="flex-1 p-6 md:p-10 overflow-y-auto">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Welcome back, {profile?.full_name || 'User'}! 👋</h1>
+            <h1 className="text-3xl font-bold">Welcome back, {profile.full_name}! 👋</h1>
             <div className="flex items-center gap-2 mt-1">
-              <Badge variant="secondary" className="capitalize">{profile?.user_type || 'User'}</Badge>
+              <Badge variant="secondary" className="capitalize">{profile.user_type}</Badge>
               <span className="text-muted-foreground text-sm flex items-center gap-1">
-                <Mail className="w-3 h-3" /> {user?.email}
+                <Mail className="w-3 h-3" /> {profile.email}
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-             <Button variant="outline" size="sm" className="lg:hidden text-destructive hover:text-destructive border-destructive/20" onClick={handleLogout}>
+          <div className="flex items-center gap-3">
+             <Button variant="outline" size="sm" className="lg:hidden text-destructive hover:text-destructive" onClick={handleLogout}>
                 <LogOut className="w-4 h-4 mr-2" /> Logout
              </Button>
-             <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-md ml-auto sm:ml-0">
-               <img src={profile?.avatar_url || `https://picsum.photos/seed/${user?.uid}/48/48`} alt="Profile" />
+             <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-md">
+               <img src={profile.avatar_url} alt="Profile" />
              </div>
           </div>
         </header>
-
-        {/* Verification Alert for Maids */}
-        {isMaid && !isVerified && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-10 bg-yellow-50 border border-yellow-200 rounded-2xl p-6 flex items-start gap-4"
-          >
-            <div className="bg-yellow-100 p-3 rounded-xl">
-              <AlertTriangle className="text-yellow-600 w-6 h-6" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-yellow-800 text-lg">Profile Verification Pending</h3>
-              <p className="text-yellow-700 mt-1">
-                Your profile is currently hidden from employers. Please ensure your profile details are complete, and an admin will review your account shortly.
-              </p>
-              <Link href="/profile">
-                <Button className="mt-4 bg-yellow-600 hover:bg-yellow-700 text-white border-none rounded-full">
-                  Complete Profile <ChevronRight className="ml-2 w-4 h-4" />
-                </Button>
-              </Link>
-            </div>
-          </motion.div>
-        )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
@@ -184,7 +111,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Pending Requests</p>
-                <p className="text-2xl font-bold">{stats.pending}</p>
+                <p className="text-2xl font-bold">2</p>
               </div>
             </CardContent>
           </Card>
@@ -195,7 +122,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Confirmed Jobs</p>
-                <p className="text-2xl font-bold">{stats.confirmed}</p>
+                <p className="text-2xl font-bold">5</p>
               </div>
             </CardContent>
           </Card>
@@ -206,7 +133,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Rating</p>
-                <p className="text-2xl font-bold">{profile?.rating || '0.0'}</p>
+                <p className="text-2xl font-bold">{profile.rating}</p>
               </div>
             </CardContent>
           </Card>
@@ -217,7 +144,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">History</p>
-                <p className="text-2xl font-bold">{bookings?.length || 0}</p>
+                <p className="text-2xl font-bold">12</p>
               </div>
             </CardContent>
           </Card>
@@ -225,13 +152,9 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold">Recent Activity</h2>
-              <Link href="/bookings" className="text-primary text-sm font-medium hover:underline">View All</Link>
-            </div>
-            
+            <h2 className="text-xl font-bold">Recent Activity</h2>
             <div className="space-y-4">
-              {bookings && bookings.slice(0, 5).map(booking => (
+              {bookings.map(booking => (
                 <Card key={booking.id} className="border-none shadow-sm hover:shadow-md transition-all">
                   <CardContent className="p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -239,7 +162,7 @@ export default function Dashboard() {
                         <Calendar className="w-4 h-4 text-slate-500" />
                       </div>
                       <div>
-                        <p className="text-sm font-bold">Booking #{booking.id.slice(0, 6)}</p>
+                        <p className="text-sm font-bold">Booking #{booking.id}</p>
                         <p className="text-xs text-muted-foreground">{booking.date} at {booking.time}</p>
                       </div>
                     </div>
@@ -247,38 +170,19 @@ export default function Dashboard() {
                   </CardContent>
                 </Card>
               ))}
-              {(!bookings || bookings.length === 0) && (
-                <Card className="border-none shadow-sm p-10 text-center">
-                  <p className="text-muted-foreground italic">No recent activity to show.</p>
-                  {profile?.user_type === 'employer' && (
-                    <Link href="/browse">
-                      <Button className="mt-4 rounded-full">Book your first maid</Button>
-                    </Link>
-                  )}
-                </Card>
-              )}
             </div>
           </div>
 
           <div className="space-y-6">
              <h2 className="text-xl font-bold">Quick Actions</h2>
              <div className="grid grid-cols-1 gap-4">
-                {profile?.user_type === 'employer' && (
-                  <Link href="/browse">
-                    <Button className="w-full h-16 bg-primary text-lg font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all">
-                      <Search className="mr-2" /> Find a Maid
-                    </Button>
-                  </Link>
-                )}
-                {isMaid && (
-                  <Link href="/profile">
-                    <Button className="w-full h-16 bg-primary text-lg font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all">
-                      <User className="mr-2" /> Update Resume
-                    </Button>
-                  </Link>
-                )}
+                <Link href="/browse">
+                  <Button className="w-full h-16 bg-primary text-lg font-bold rounded-2xl">
+                    <Search className="mr-2" /> Find a Maid
+                  </Button>
+                </Link>
                 <Link href="/map">
-                  <Button variant="secondary" className="w-full h-16 bg-white border border-border text-lg font-bold rounded-2xl hover:bg-slate-50 transition-all">
+                  <Button variant="secondary" className="w-full h-16 bg-white border border-border text-lg font-bold rounded-2xl">
                     <MapIcon className="mr-2" /> View Map
                   </Button>
                 </Link>

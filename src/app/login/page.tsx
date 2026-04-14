@@ -19,12 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, User } from 'firebase/auth';
-import { useAuth, useFirestore } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -32,12 +27,9 @@ const loginSchema = z.object({
 });
 
 export default function LoginPage() {
-  const auth = useAuth();
-  const db = useFirestore();
   const router = useRouter();
   const [showPassword, setShowPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
-  const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof loginSchema>>({
@@ -48,119 +40,18 @@ export default function LoginPage() {
     },
   });
 
-  async function handleRedirect(user: User) {
-    // Priority 1: Hardcoded Admin Email Check
-    if (user.email?.toLowerCase() === 'maids.admin@email.com') {
-      router.push('/admin');
-      return;
-    }
-
-    if (!db) {
-      router.push('/dashboard');
-      return;
-    }
-
-    const userRef = doc(db, 'users', user.uid);
-    try {
-      const userSnap = await getDoc(userRef);
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-        if (userData.user_type === 'admin') {
-          router.push('/admin');
-        } else {
-          router.push('/dashboard');
-        }
+  async function onSubmit(values: z.infer<typeof loginSchema>) {
+    setIsLoading(true);
+    // Mock authentication
+    setTimeout(() => {
+      setIsLoading(false);
+      if (values.email === 'maids.admin@email.com') {
+        router.push('/admin');
       } else {
         router.push('/dashboard');
       }
-    } catch (e) {
-      // If we can't read the profile, default to standard dashboard
-      router.push('/dashboard');
-    }
-  }
-
-  async function handleGoogleSignIn() {
-    if (!auth || !db) return;
-    setIsGoogleLoading(true);
-    try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      const userRef = doc(db, 'users', user.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        const isAdminEmail = user.email?.toLowerCase() === 'maids.admin@email.com';
-        const finalRole = isAdminEmail ? 'admin' : 'employer';
-        
-        const userData = {
-          full_name: user.displayName || 'Google User',
-          email: user.email,
-          user_type: finalRole,
-          is_verified: finalRole === 'admin',
-          avatar_url: user.photoURL || `https://picsum.photos/seed/${user.uid}/200/200`,
-          created_at: serverTimestamp(),
-          district: "",
-          bio: "",
-          hourly_rate: 0,
-          skills: [],
-          languages: [],
-          availability: "",
-          rating: 0,
-          review_count: 0,
-          experience: 0
-        };
-
-        setDoc(userRef, userData)
-          .then(() => handleRedirect(user))
-          .catch(async () => {
-            // Even if DB write fails, try to redirect based on email
-            handleRedirect(user);
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-              path: userRef.path,
-              operation: 'create',
-              requestResourceData: userData,
-            }));
-          });
-      } else {
-        await handleRedirect(user);
-      }
-
-      toast({
-        title: "Welcome!",
-        description: `Signed in as ${user.displayName}`,
-      });
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Sign-In Failed",
-        description: error.message || "Google sign-in failed.",
-      });
-    } finally {
-      setIsGoogleLoading(false);
-    }
-  }
-
-  async function onSubmit(values: z.infer<typeof loginSchema>) {
-    if (!auth) return;
-    setIsLoading(true);
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
-      toast({
-        title: "Login Successful",
-        description: "Welcome back!",
-      });
-      await handleRedirect(userCredential.user);
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Login Failed",
-        description: error.message || "Invalid credentials. Please try again.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+      toast({ title: "Logged in successfully", description: "Welcome back!" });
+    }, 1000);
   }
 
   return (
@@ -189,7 +80,7 @@ export default function LoginPage() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="maids.admin@email.com" {...field} className="h-11" />
+                        <Input placeholder="user@email.com" {...field} className="h-11" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -222,7 +113,7 @@ export default function LoginPage() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full h-11 bg-primary text-lg" disabled={isLoading || isGoogleLoading}>
+                <Button type="submit" className="w-full h-11 bg-primary text-lg" disabled={isLoading}>
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sign In"}
                 </Button>
               </form>
@@ -240,10 +131,9 @@ export default function LoginPage() {
             <Button 
               variant="outline" 
               className="w-full h-11 gap-2" 
-              onClick={handleGoogleSignIn}
-              disabled={isLoading || isGoogleLoading}
+              onClick={() => toast({ title: "Google Login", description: "Demo only" })}
             >
-              {isGoogleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Chrome className="w-4 h-4" />}
+              <Chrome className="w-4 h-4" />
               Sign in with Google
             </Button>
           </CardContent>

@@ -36,17 +36,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { useDoc, useFirestore, useUser, useCollection } from '@/firebase';
-import { doc, collection, addDoc, serverTimestamp, query, where } from 'firebase/firestore';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 
 export default function ProfileDetails() {
   const { id } = useParams();
   const { toast } = useToast();
   const router = useRouter();
-  const db = useFirestore();
-  const { user } = useUser();
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,97 +54,55 @@ export default function ProfileDetails() {
   const [reportReason, setReportReason] = useState('');
   const [reportDetails, setReportDetails] = useState('');
 
-  const userRef = useMemo(() => (id && db ? doc(db, 'users', id as string) : null), [id, db]);
-  const { data: profile, loading: isLoading } = useDoc(userRef);
+  // Mock data, since we're not fetching from Firebase anymore
+  const profile = {
+    id: '1',
+    full_name: 'Jane Doe',
+    is_verified: true,
+    district: 'Kampala',
+    rating: 4.5,
+    experience: 5,
+    review_count: 12,
+    hourly_rate: 15000,
+    bio: 'Experienced and reliable domestic worker with over 5 years of experience. I am passionate about providing a clean and comfortable environment for my clients.',
+    skills: ['Cleaning', 'Cooking', 'Laundry', 'Child Care'],
+    avatar_url: `https://picsum.photos/seed/${id}/400/400`,
+  };
 
-  // Fetch Reviews
-  const reviewsQuery = useMemo(() => {
-    if (!db || !id) return null;
-    return query(collection(db, 'reviews'), where('reviewee_id', '==', id));
-  }, [db, id]);
-  const { data: reviews, loading: loadingReviews } = useCollection(reviewsQuery);
+  const reviews = [
+    {
+      id: '1',
+      rating: 5,
+      comment: 'Jane is fantastic! She is very thorough and efficient. I would highly recommend her.',
+      created_at: { seconds: new Date().getTime() / 1000 },
+    },
+    {
+      id: '2',
+      rating: 4,
+      comment: 'Good service, but was a little late.',
+      created_at: { seconds: new Date().getTime() / 1000 },
+    },
+  ];
+
+  const isLoading = false;
 
   const handleBookNow = () => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please login to book a maid.",
-        variant: "destructive",
-      });
-      router.push('/login');
-      return;
-    }
+    toast({ title: "Booking not implemented" });
     setIsBookingOpen(true);
   };
 
   const confirmBooking = async () => {
-    if (!db || !user || !profile) return;
     setIsSubmitting(true);
-
-    const bookingData = {
-      employer_id: user.uid,
-      maid_id: id,
-      date: bookingDate,
-      time: bookingTime,
-      duration: parseInt(duration),
-      total_price: (profile.hourly_rate || 0) * parseInt(duration),
-      status: 'pending',
-      created_at: serverTimestamp(),
-      services: profile.skills || [],
-    };
-
-    addDoc(collection(db, 'bookings'), bookingData)
-      .then(() => {
-        setIsSubmitting(false);
-        setIsBookingOpen(false);
-        toast({
-          title: "Booking Requested",
-          description: `Your request has been sent to ${profile.full_name}.`,
-        });
-        router.push('/bookings');
-      })
-      .catch(async () => {
-        setIsSubmitting(false);
-        const permissionError = new FirestorePermissionError({
-          path: 'bookings',
-          operation: 'create',
-          requestResourceData: bookingData,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      });
+    toast({ title: "Booking not implemented" });
+    setIsSubmitting(false);
+    setIsBookingOpen(false);
   };
 
   const submitReport = async () => {
-    if (!db || !user || !profile) return;
     setIsSubmitting(true);
-
-    const reportData = {
-      reporter_id: user.uid,
-      reported_id: id,
-      reason: reportReason,
-      details: reportDetails,
-      status: 'pending',
-      created_at: serverTimestamp(),
-    };
-
-    addDoc(collection(db, 'reports'), reportData)
-      .then(() => {
-        setIsSubmitting(false);
-        setIsReportOpen(false);
-        toast({
-          title: "Report Submitted",
-          description: "Our moderation team will review your report shortly.",
-        });
-      })
-      .catch(async () => {
-        setIsSubmitting(false);
-        const permissionError = new FirestorePermissionError({
-          path: 'reports',
-          operation: 'create',
-          requestResourceData: reportData,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      });
+    toast({ title: "Reporting not implemented" });
+    setIsSubmitting(false);
+    setIsReportOpen(false);
   };
 
   if (isLoading) {
