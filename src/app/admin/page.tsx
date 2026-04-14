@@ -16,7 +16,8 @@ import {
   ArrowLeft,
   Database,
   Eye,
-  Lock
+  Lock,
+  ExternalLink
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -68,7 +69,7 @@ import { useRouter } from 'next/navigation';
 const addUserSchema = z.object({
   full_name: z.string().min(2, "Name is too short"),
   email: z.string().email("Invalid email"),
-  user_type: z.enum(["maid", "employer"]),
+  user_type: z.enum(["maid", "employer", "admin"]),
   district: z.string().min(2, "District is required"),
   bio: z.string().optional(),
   hourly_rate: z.coerce.number().min(0).optional(),
@@ -181,7 +182,7 @@ export default function AdminDashboard() {
       });
   };
 
-  if (loadingProfile || loadingUsers || loadingReports || loadingBookings) {
+  if (loadingProfile) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <Loader2 className="w-10 h-10 text-primary animate-spin" />
@@ -203,12 +204,21 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent className="space-y-6 text-center">
             <div className="p-4 bg-slate-950 rounded-xl border border-slate-800">
-               <p className="text-xs text-slate-500 mb-2 uppercase tracking-widest">Your Unique User ID</p>
-               <code className="text-primary font-mono text-sm break-all">{user?.uid}</code>
+               <p className="text-xs text-slate-500 mb-2 uppercase tracking-widest">Your Current User ID</p>
+               <code className="text-primary font-mono text-sm break-all select-all cursor-pointer" title="Click to copy ID" onClick={() => {
+                 navigator.clipboard.writeText(user?.uid || '');
+                 toast({ title: "Copied ID", description: "Use this ID to promote yourself in the Firebase Console." });
+               }}>{user?.uid}</code>
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              To gain access, you must change your <b>user_type</b> to <b>"admin"</b> in the Firestore "users" collection for the ID above using the Firebase Console.
-            </p>
+            <div className="text-left text-xs text-slate-400 space-y-2 leading-relaxed">
+              <p>To gain access, you must manually set your role in the database:</p>
+              <ol className="list-decimal list-inside space-y-1 ml-1">
+                <li>Go to the <a href="https://console.firebase.google.com/u/0/project/savings-central/firestore/data" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center inline-flex gap-1">Firebase Console <ExternalLink className="w-3 h-3" /></a></li>
+                <li>Find the document with the ID above in the <b>"users"</b> collection.</li>
+                <li>Change the <b>user_type</b> field to <b>"admin"</b>.</li>
+                <li>Refresh this page.</li>
+              </ol>
+            </div>
             <Button className="w-full rounded-full h-11" variant="outline" onClick={() => router.push('/dashboard')}>
               Return to Dashboard
             </Button>
@@ -291,6 +301,7 @@ export default function AdminDashboard() {
                           <SelectContent className="bg-slate-900 border-slate-800 text-white">
                             <SelectItem value="maid">Maid</SelectItem>
                             <SelectItem value="employer">Employer</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />

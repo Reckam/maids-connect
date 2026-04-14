@@ -53,13 +53,14 @@ export default function LoginPage() {
     
     if (userSnap.exists()) {
       const userData = userSnap.data();
+      // Role-based redirection logic
       if (userData.user_type === 'admin') {
         router.push('/admin');
       } else {
         router.push('/dashboard');
       }
     } else {
-      // Fallback for missing profiles
+      // Fallback for missing profiles: redirect to dashboard where they'll see a profile setup prompt
       router.push('/dashboard');
     }
   }
@@ -76,10 +77,11 @@ export default function LoginPage() {
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
+        // Create basic profile for new Google users
         await setDoc(userRef, {
           full_name: user.displayName || 'Google User',
           email: user.email,
-          user_type: 'employer',
+          user_type: 'employer', // Default role
           is_verified: false,
           avatar_url: user.photoURL || `https://picsum.photos/seed/${user.uid}/200/200`,
           created_at: serverTimestamp(),
