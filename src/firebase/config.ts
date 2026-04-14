@@ -1,4 +1,3 @@
-
 export const firebaseConfig = {
   apiKey: "AIzaSyDJiS2hyObkjoRNNExC1o6ufSvmipqtly0",
   authDomain: "savings-central.firebaseapp.com",

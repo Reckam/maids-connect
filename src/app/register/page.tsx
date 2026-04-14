@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { Suspense } from 'react';
@@ -21,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth, useFirestore } from '@/firebase';
 
 const registerSchema = z.object({
@@ -58,13 +57,23 @@ function RegisterForm() {
 
       await updateProfile(user, { displayName: values.full_name });
 
-      await setDoc(doc(db, 'users', user.uid), {
+      const userRef = doc(db, 'users', user.uid);
+      await setDoc(userRef, {
         full_name: values.full_name,
         email: values.email,
         user_type: role,
         is_verified: false,
-        created_at: new Date().toISOString(),
+        created_at: serverTimestamp(),
         avatar_url: `https://picsum.photos/seed/${user.uid}/200/200`,
+        district: "",
+        bio: "",
+        hourly_rate: 0,
+        skills: [],
+        languages: [],
+        availability: "",
+        rating: 0,
+        review_count: 0,
+        experience: 0
       });
 
       toast({
@@ -73,10 +82,16 @@ function RegisterForm() {
       });
       router.push('/dashboard');
     } catch (error: any) {
+      let errorMessage = error.message || "An error occurred during registration.";
+      
+      if (error.code === 'auth/configuration-not-found') {
+        errorMessage = "Authentication is not enabled in the Firebase Console. Please enable 'Email/Password' in the Authentication tab.";
+      }
+
       toast({
         variant: "destructive",
         title: "Registration Failed",
-        description: error.message || "An error occurred during registration.",
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);

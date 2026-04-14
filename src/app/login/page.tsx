@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -53,14 +52,12 @@ export default function LoginPage() {
     
     if (userSnap.exists()) {
       const userData = userSnap.data();
-      // Role-based redirection logic
       if (userData.user_type === 'admin') {
         router.push('/admin');
       } else {
         router.push('/dashboard');
       }
     } else {
-      // Fallback for missing profiles: redirect to dashboard where they'll see a profile setup prompt
       router.push('/dashboard');
     }
   }
@@ -77,14 +74,22 @@ export default function LoginPage() {
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
-        // Create basic profile for new Google users
         await setDoc(userRef, {
           full_name: user.displayName || 'Google User',
           email: user.email,
-          user_type: 'employer', // Default role
+          user_type: 'employer',
           is_verified: false,
           avatar_url: user.photoURL || `https://picsum.photos/seed/${user.uid}/200/200`,
           created_at: serverTimestamp(),
+          district: "",
+          bio: "",
+          hourly_rate: 0,
+          skills: [],
+          languages: [],
+          availability: "",
+          rating: 0,
+          review_count: 0,
+          experience: 0
         });
         router.push('/dashboard');
       } else {
@@ -96,10 +101,14 @@ export default function LoginPage() {
         description: `Signed in as ${user.displayName}`,
       });
     } catch (error: any) {
+      let errorMessage = error.message || "Google sign-in failed.";
+      if (error.code === 'auth/configuration-not-found') {
+        errorMessage = "Authentication is not enabled in the Firebase Console. Please enable 'Google' in the Authentication tab.";
+      }
       toast({
         variant: "destructive",
-        title: "Google Sign-In Failed",
-        description: error.message,
+        title: "Sign-In Failed",
+        description: errorMessage,
       });
     } finally {
       setIsGoogleLoading(false);
@@ -117,10 +126,14 @@ export default function LoginPage() {
       });
       await handleRedirectByRole(userCredential.user.uid);
     } catch (error: any) {
+      let errorMessage = error.message || "Invalid credentials. Please try again.";
+      if (error.code === 'auth/configuration-not-found') {
+        errorMessage = "Authentication is not enabled in the Firebase Console. Please enable 'Email/Password' in the Authentication tab.";
+      }
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: error.message || "Invalid credentials. Please try again.",
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);
