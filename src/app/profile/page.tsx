@@ -39,7 +39,6 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { Badge } from "@/components/ui/badge";
-import { aidMaidBioCreation } from '@/ai/flows/aid-maid-bio-creation';
 
 const profileSchema = z.object({
   full_name: z.string().min(2, { message: "Name is too short" }),
@@ -167,12 +166,23 @@ export default function ProfileManagementPage() {
 
     setIsOptimizing(true);
     try {
-      const result = await aidMaidBioCreation({
-        skills: values.skills.split(',').map(s => s.trim()),
-        experience: values.experience || 0,
-        currentBio: values.bio
+      const response = await fetch('/api/ai/generate-bio', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          skills: values.skills.split(',').map(s => s.trim()),
+          experience: values.experience || 0,
+          currentBio: values.bio,
+        }),
       });
-      
+
+      if (!response.ok) {
+        throw new Error('Failed to optimize bio');
+      }
+
+      const result = await response.json();
       form.setValue('bio', result.generatedBio);
       toast({ title: "Bio Optimized", description: "Your bio has been professionally rewritten by AI." });
     } catch (error) {
