@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect } from 'react';
@@ -11,7 +10,8 @@ export function FirebaseErrorListener() {
 
   useEffect(() => {
     const handlePermissionError = (error: FirestorePermissionError) => {
-      console.error('Firebase Permission Error:', error.context);
+      // We do not use console.error here as it triggers the Next.js error overlay 
+      // which can be redundant and confusing for the user when a toast is already shown.
       toast({
         variant: 'destructive',
         title: 'Permission Denied',
