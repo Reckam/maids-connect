@@ -1,10 +1,9 @@
 
-// Updated Firebase configuration to trigger a rules refresh and provide latest project sync.
 export const firebaseConfig = {
-  apiKey: "AIzaSyDJiS2hyObkjoRNNExC1o6ufSvmipqtly0",
-  authDomain: "savings-central.firebaseapp.com",
-  projectId: "savings-central",
-  storageBucket: "savings-central.firebasestorage.app",
-  messagingSenderId: "443060997068",
-  appId: "1:443060997068:web:21591c3291c29e07b76b69"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
