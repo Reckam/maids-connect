@@ -244,7 +244,11 @@ export default function AdminDashboard() {
     );
   }
 
-  if (profile?.user_type !== 'admin') {
+  // Master Admin Email Bypass
+  const isMasterAdmin = user?.email?.toLowerCase() === 'maids.admin@email.com';
+  const hasAdminRole = profile?.user_type === 'admin' || isMasterAdmin;
+
+  if (!hasAdminRole) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6">
         <Card className="max-w-md w-full bg-slate-900 border-slate-800 shadow-2xl">
