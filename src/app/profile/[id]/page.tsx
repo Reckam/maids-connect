@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
   ShieldCheck, 
@@ -12,32 +12,96 @@ import {
   CheckCircle2, 
   MessageSquare, 
   ChevronLeft,
-  Sparkles,
   Loader2,
-  ArrowLeft
+  ArrowLeft,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { useDoc, useFirestore } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useDoc, useFirestore, useUser } from '@/firebase';
+import { doc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export default function ProfileDetails() {
   const { id } = useParams();
   const { toast } = useToast();
   const router = useRouter();
   const db = useFirestore();
+  const { user } = useUser();
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Booking Form State
+  const [bookingDate, setBookingDate] = useState('');
+  const [bookingTime, setBookingTime] = useState('');
+  const [duration, setDuration] = useState('2');
 
   const userRef = useMemo(() => (id && db ? doc(db, 'users', id as string) : null), [id, db]);
   const { data: profile, loading: isLoading } = useDoc(userRef);
 
   const handleBookNow = () => {
-    toast({
-      title: "Booking Initiated",
-      description: "This feature will be available soon!",
-    });
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please login to book a maid.",
+        variant: "destructive",
+      });
+      router.push('/login');
+      return;
+    }
+    setIsBookingOpen(true);
+  };
+
+  const confirmBooking = async () => {
+    if (!db || !user || !profile) return;
+    setIsSubmitting(true);
+
+    const bookingData = {
+      employer_id: user.uid,
+      maid_id: id,
+      date: bookingDate,
+      time: bookingTime,
+      duration: parseInt(duration),
+      total_price: (profile.hourly_rate || 0) * parseInt(duration),
+      status: 'pending',
+      created_at: serverTimestamp(),
+      services: profile.skills || [],
+    };
+
+    addDoc(collection(db, 'bookings'), bookingData)
+      .then(() => {
+        setIsSubmitting(false);
+        setIsBookingOpen(false);
+        toast({
+          title: "Booking Requested",
+          description: `Your request has been sent to ${profile.full_name}.`,
+        });
+        router.push('/bookings');
+      })
+      .catch(async (error) => {
+        setIsSubmitting(false);
+        const permissionError = new FirestorePermissionError({
+          path: 'bookings',
+          operation: 'create',
+          requestResourceData: bookingData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
   };
 
   if (isLoading) {
@@ -72,7 +136,6 @@ export default function ProfileDetails() {
 
       <div className="max-w-6xl mx-auto px-6 pt-24">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Profile Summary */}
           <div className="lg:col-span-1 space-y-6">
             <Card className="overflow-hidden border-none shadow-xl text-center">
               <div className="h-48 bg-primary/10 relative">
@@ -107,7 +170,7 @@ export default function ProfileDetails() {
 
                 <div className="space-y-3 pt-4">
                    <p className="text-primary font-bold text-xl">UGX {profile.hourly_rate?.toLocaleString() || 'N/A'}/hr</p>
-                   <Button onClick={handleBookNow} className="w-full h-12 bg-primary text-lg rounded-xl">Book Now</Button>
+                   <Button onClick={handleBookNow} className="w-full h-12 bg-primary text-lg rounded-xl shadow-lg shadow-primary/20">Book Now</Button>
                    <Button variant="outline" className="w-full h-12 border-primary text-primary rounded-xl">
                      <MessageSquare className="mr-2 w-4 h-4" /> Contact
                    </Button>
@@ -136,7 +199,6 @@ export default function ProfileDetails() {
             </Card>
           </div>
 
-          {/* Right Column - Skills, Bio, Reviews */}
           <div className="lg:col-span-2 space-y-8">
             <Card className="border-none shadow-lg">
               <CardHeader className="flex flex-row items-center justify-between">
@@ -164,11 +226,77 @@ export default function ProfileDetails() {
 
             <div className="space-y-4">
               <h2 className="text-2xl font-bold">Reviews</h2>
-              <p className='text-sm text-muted-foreground'>No reviews yet.</p>
+              <div className="bg-white p-8 rounded-2xl border border-dashed text-center">
+                 <Star className="w-10 h-10 text-slate-200 mx-auto mb-2" />
+                 <p className='text-sm text-muted-foreground italic'>No reviews yet for this professional.</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      <Dialog open={isBookingOpen} onOpenChange={setIsBookingOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Book {profile.full_name}</DialogTitle>
+            <DialogDescription>
+              Select a date and time for your cleaning or domestic service.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="date" className="text-right">Date</Label>
+              <Input
+                id="date"
+                type="date"
+                className="col-span-3"
+                value={bookingDate}
+                onChange={(e) => setBookingDate(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="time" className="text-right">Time</Label>
+              <Input
+                id="time"
+                type="time"
+                className="col-span-3"
+                value={bookingTime}
+                onChange={(e) => setBookingTime(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="duration" className="text-right">Hours</Label>
+              <Select value={duration} onValueChange={setDuration}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="How many hours?" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2">2 Hours</SelectItem>
+                  <SelectItem value="4">4 Hours (Half Day)</SelectItem>
+                  <SelectItem value="8">8 Hours (Full Day)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="pt-4 border-t mt-2">
+              <div className="flex justify-between items-center text-sm font-bold">
+                 <span>Total Price:</span>
+                 <span className="text-primary text-lg">UGX {(profile.hourly_rate * parseInt(duration)).toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBookingOpen(false)}>Cancel</Button>
+            <Button 
+              disabled={!bookingDate || !bookingTime || isSubmitting} 
+              onClick={confirmBooking}
+              className="bg-primary"
+            >
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CalendarIcon className="w-4 h-4 mr-2" />}
+              Send Booking Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

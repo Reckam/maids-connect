@@ -12,22 +12,21 @@ import {
   Clock, 
   TrendingUp, 
   Star,
-  Settings,
   LogOut,
-  Menu,
   ShieldCheck,
   ShieldAlert,
   AlertTriangle,
   ChevronRight,
   Loader2,
-  Mail
+  Mail,
+  Plus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { useUser, useDoc, useFirestore, useAuth } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useUser, useDoc, useFirestore, useAuth, useCollection } from '@/firebase';
+import { doc, collection, query, where, or, limit, orderBy } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 
@@ -39,6 +38,29 @@ export default function Dashboard() {
 
   const userDocRef = useMemo(() => (user && db ? doc(db, 'users', user.uid) : null), [user, db]);
   const { data: profile, loading: isLoading } = useDoc(userDocRef);
+
+  // Fetch real booking counts
+  const bookingsQuery = useMemo(() => {
+    if (!user || !db) return null;
+    return query(
+      collection(db, 'bookings'),
+      or(
+        where('employer_id', '==', user.uid),
+        where('maid_id', '==', user.uid)
+      )
+    );
+  }, [user, db]);
+
+  const { data: bookings } = useCollection(bookingsQuery);
+
+  const stats = useMemo(() => {
+    if (!bookings) return { pending: 0, completed: 0, scheduled: 0 };
+    return {
+      pending: bookings.filter(b => b.status === 'pending').length,
+      completed: bookings.filter(b => b.status === 'completed').length,
+      confirmed: bookings.filter(b => b.status === 'confirmed').length,
+    };
+  }, [bookings]);
 
   const handleLogout = async () => {
     if (auth) {
@@ -159,8 +181,8 @@ export default function Dashboard() {
                 <Clock className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Pending Bookings</p>
-                <p className="text-2xl font-bold">0</p>
+                <p className="text-sm text-muted-foreground">Pending Requests</p>
+                <p className="text-2xl font-bold">{stats.pending}</p>
               </div>
             </CardContent>
           </Card>
@@ -170,8 +192,8 @@ export default function Dashboard() {
                 <CheckCircle className="w-6 h-6 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Completed Jobs</p>
-                <p className="text-2xl font-bold">0</p>
+                <p className="text-sm text-muted-foreground">Confirmed Jobs</p>
+                <p className="text-2xl font-bold">{stats.confirmed}</p>
               </div>
             </CardContent>
           </Card>
@@ -181,7 +203,7 @@ export default function Dashboard() {
                 <Star className="w-6 h-6 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Average Rating</p>
+                <p className="text-sm text-muted-foreground">Rating</p>
                 <p className="text-2xl font-bold">{profile?.rating || '0.0'}</p>
               </div>
             </CardContent>
@@ -192,8 +214,8 @@ export default function Dashboard() {
                 <Calendar className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Scheduled Today</p>
-                <p className="text-2xl font-bold">0</p>
+                <p className="text-sm text-muted-foreground">History</p>
+                <p className="text-2xl font-bold">{bookings?.length || 0}</p>
               </div>
             </CardContent>
           </Card>
@@ -206,14 +228,34 @@ export default function Dashboard() {
               <Link href="/bookings" className="text-primary text-sm font-medium hover:underline">View All</Link>
             </div>
             
-            <Card className="border-none shadow-sm p-10 text-center">
-              <p className="text-muted-foreground italic">No recent activity to show.</p>
-              {profile?.user_type === 'employer' && (
-                <Link href="/browse">
-                  <Button className="mt-4 rounded-full">Book your first maid</Button>
-                </Link>
+            <div className="space-y-4">
+              {bookings && bookings.slice(0, 5).map(booking => (
+                <Card key={booking.id} className="border-none shadow-sm hover:shadow-md transition-all">
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-slate-100 p-2 rounded-full">
+                        <Calendar className="w-4 h-4 text-slate-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold">Booking #{booking.id.slice(0, 6)}</p>
+                        <p className="text-xs text-muted-foreground">{booking.date} at {booking.time}</p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="capitalize text-[10px]">{booking.status}</Badge>
+                  </CardContent>
+                </Card>
+              ))}
+              {(!bookings || bookings.length === 0) && (
+                <Card className="border-none shadow-sm p-10 text-center">
+                  <p className="text-muted-foreground italic">No recent activity to show.</p>
+                  {profile?.user_type === 'employer' && (
+                    <Link href="/browse">
+                      <Button className="mt-4 rounded-full">Book your first maid</Button>
+                    </Link>
+                  )}
+                </Card>
               )}
-            </Card>
+            </div>
           </div>
 
           <div className="space-y-6">
@@ -222,20 +264,20 @@ export default function Dashboard() {
                 {profile?.user_type === 'employer' && (
                   <Link href="/browse">
                     <Button className="w-full h-16 bg-primary text-lg font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all">
-                      Find a Maid
+                      <Search className="mr-2" /> Find a Maid
                     </Button>
                   </Link>
                 )}
                 {isMaid && (
                   <Link href="/profile">
                     <Button className="w-full h-16 bg-primary text-lg font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all">
-                      Update My Resume
+                      <User className="mr-2" /> Update Resume
                     </Button>
                   </Link>
                 )}
                 <Link href="/map">
                   <Button variant="secondary" className="w-full h-16 bg-white border border-border text-lg font-bold rounded-2xl hover:bg-slate-50 transition-all">
-                    View Interactive Map
+                    <MapIcon className="mr-2" /> View Map
                   </Button>
                 </Link>
              </div>
