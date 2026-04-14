@@ -102,7 +102,7 @@ export default function ProfileManagementPage() {
       .single();
 
     if (userError) {
-      toast({ variant: "destructive", title: "Error", description: "Could not fetch user profile." });
+      toast({ variant: "destructive", title: "Error", description: "Could not fetch user profile. Please check your database connection." });
       setLoadingProfile(false);
       return;
     }
@@ -172,22 +172,27 @@ export default function ProfileManagementPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          skills: values.skills.split(',').map(s => s.trim()),
+          skills: values.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
           experience: values.experience || 0,
           currentBio: values.bio,
         }),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to optimize bio');
+        throw new Error(result.error || 'Failed to optimize bio');
       }
 
-      const result = await response.json();
       form.setValue('bio', result.generatedBio);
       toast({ title: "Bio Optimized", description: "Your bio has been professionally rewritten by AI." });
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast({ variant: "destructive", title: "AI Error", description: "Failed to optimize bio. Please try again." });
+      toast({ 
+        variant: "destructive", 
+        title: "AI Error", 
+        description: error.message || "Failed to optimize bio. Please ensure AI is configured." 
+      });
     } finally {
       setIsOptimizing(false);
     }
@@ -197,7 +202,7 @@ export default function ProfileManagementPage() {
     if (!user) return;
     setIsSaving(true);
     
-    const { user_type, full_name, district, ...rest } = values;
+    const { user_type, full_name, district } = values;
 
     const { error: userError } = await supabase
       .from('users')
@@ -205,7 +210,7 @@ export default function ProfileManagementPage() {
       .eq('id', user.id);
     
     if (userError) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update profile.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update basic user info.' });
       setIsSaving(false);
       return;
     }
@@ -221,7 +226,6 @@ export default function ProfileManagementPage() {
         availability: values.availability,
       };
 
-      // Upsert to maids table
       const { error } = await supabase.from('maids').upsert({
         id: user.id,
         ...maidData
@@ -232,7 +236,7 @@ export default function ProfileManagementPage() {
     setIsSaving(false);
 
     if (profileError) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update specific profile details.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update professional details.' });
     } else {
       toast({
         title: "Profile Updated",
@@ -245,7 +249,10 @@ export default function ProfileManagementPage() {
   if (loadingProfile || !profile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-10 h-10 text-primary animate-spin" />
+          <p className="text-muted-foreground animate-pulse">Loading Profile...</p>
+        </div>
       </div>
     );
   }
@@ -295,7 +302,7 @@ export default function ProfileManagementPage() {
                           <AlertCircle className="w-5 h-5 shrink-0" />
                           <div>
                             <p className="font-bold text-sm">Pending Verification</p>
-                            <p className="text-xs opacity-80">Complete your details. An admin will review your profile shortly.</p>
+                            <p className="text-xs opacity-80">Complete your details for review.</p>
                           </div>
                         </>
                       )}
@@ -309,7 +316,7 @@ export default function ProfileManagementPage() {
             <Card className="border-none shadow-md">
               <CardHeader>
                 <CardTitle>Details</CardTitle>
-                <CardDescription>Fill in your professional information to attract {isMaid ? 'employers' : 'maids'}.</CardDescription>
+                <CardDescription>Update your professional profile to reach more clients.</CardDescription>
               </CardHeader>
               <CardContent>
                 <Form {...form}>
@@ -398,7 +405,7 @@ export default function ProfileManagementPage() {
                                  type="button" 
                                  variant="ghost" 
                                  size="sm" 
-                                 className="text-primary gap-1 h-7"
+                                 className="text-primary gap-1 h-7 bg-primary/5"
                                  onClick={handleAIBioOptimize}
                                  disabled={isOptimizing}
                                >
@@ -407,9 +414,9 @@ export default function ProfileManagementPage() {
                                </Button>
                             </div>
                             <FormControl>
-                              <Textarea {...field} placeholder="Describe your experience and what makes you a great choice..." className="min-h-[120px]" />
+                              <Textarea {...field} placeholder="Tell your story..." className="min-h-[120px]" />
                             </FormControl>
-                            <FormDescription>At least 20 characters.</FormDescription>
+                            <FormDescription>At least 20 characters for a good profile.</FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -426,48 +433,10 @@ export default function ProfileManagementPage() {
                             <FormControl>
                               <div className="relative">
                                 <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input {...field} placeholder="Cleaning, Cooking, Babysitting..." className="pl-10" />
+                                <Input {...field} placeholder="Cleaning, Cooking, Child Care..." className="pl-10" />
                               </div>
                             </FormControl>
-                            <FormDescription>Separate skills with commas.</FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    }
-
-                    {isMaid &&
-                      <FormField
-                        control={form.control}
-                        name="languages"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Languages</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <Languages className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input {...field} placeholder="Luganda, English, Swahili..." className="pl-10" />
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    }
-
-                    {isMaid &&
-                      <FormField
-                        control={form.control}
-                        name="availability"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Availability</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input {...field} placeholder="Mon-Fri, 8 AM - 5 PM" className="pl-10" />
-                              </div>
-                            </FormControl>
+                            <FormDescription>Separate with commas.</FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -478,12 +447,12 @@ export default function ProfileManagementPage() {
                       {isSaving ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Saving Changes...
+                          Saving...
                         </>
                       ) : (
                         <>
                           <Save className="mr-2 w-5 h-5" />
-                          Save Profile Details
+                          Update Profile
                         </>
                       )}
                     </Button>

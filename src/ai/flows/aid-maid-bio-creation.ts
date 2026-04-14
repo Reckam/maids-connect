@@ -42,9 +42,9 @@ const prompt = ai.definePrompt({
   name: 'aidMaidBioCreationPrompt',
   input: {schema: AidMaidBioCreationInputSchema},
   output: {schema: AidMaidBioCreationOutputSchema},
-  prompt: `You are an AI assistant specialized in writing professional and attractive profile bios for domestic workers (maids). Your goal is to create a compelling bio that highlights the maid's skills and experience to attract suitable employers.
+  prompt: `You are an AI assistant specialized in writing professional and attractive profile bios for domestic workers (maids) in Uganda. Your goal is to create a compelling bio that highlights the maid's skills and experience to attract suitable employers.
 
-Skills: {{{skills}}}
+Skills: {{#each skills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}
 Experience (years): {{{experience}}}
 
 {{#if currentBio}}
@@ -56,7 +56,7 @@ Refine the above bio to make it more professional, engaging, and highlight the m
 Write a professional and engaging profile bio for a maid based on the provided skills and experience. Highlight their strengths and make it appealing to potential employers.
 {{/if}}
 
-Aim for a friendly, trustworthy, and competent tone.`,
+Aim for a friendly, trustworthy, and competent tone. Return ONLY the bio text in the generatedBio field.`,
 });
 
 const aidMaidBioCreationFlow = ai.defineFlow(
@@ -68,7 +68,7 @@ const aidMaidBioCreationFlow = ai.defineFlow(
   async input => {
     const {output} = await prompt(input);
     if (!output) {
-      throw new Error('Failed to generate bio.');
+      throw new Error('Failed to generate bio content from AI model.');
     }
     return output;
   }
