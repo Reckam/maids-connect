@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -61,10 +60,11 @@ export default function LoginPage() {
           router.push('/dashboard');
         }
       } else {
+        // Fallback for new users without a profile document
         router.push('/dashboard');
       }
     } catch (e) {
-      // If we can't read the profile, it might be a permission issue during the check
+      // Silently handle read errors during redirect; the dashboard will handle its own state
       router.push('/dashboard');
     }
   }
@@ -109,12 +109,11 @@ export default function LoginPage() {
             }
           })
           .catch(async () => {
-            const permissionError = new FirestorePermissionError({
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
               path: userRef.path,
               operation: 'create',
               requestResourceData: userData,
-            });
-            errorEmitter.emit('permission-error', permissionError);
+            }));
           });
       } else {
         await handleRedirectByRole(user.uid);
@@ -125,14 +124,10 @@ export default function LoginPage() {
         description: `Signed in as ${user.displayName}`,
       });
     } catch (error: any) {
-      let errorMessage = error.message || "Google sign-in failed.";
-      if (error.code === 'auth/configuration-not-found') {
-        errorMessage = "Google Authentication is not enabled in the Firebase Console. Please enable it in the Authentication tab.";
-      }
       toast({
         variant: "destructive",
         title: "Sign-In Failed",
-        description: errorMessage,
+        description: error.message || "Google sign-in failed.",
       });
     } finally {
       setIsGoogleLoading(false);
@@ -150,14 +145,10 @@ export default function LoginPage() {
       });
       await handleRedirectByRole(userCredential.user.uid);
     } catch (error: any) {
-      let errorMessage = error.message || "Invalid credentials. Please try again.";
-      if (error.code === 'auth/configuration-not-found') {
-        errorMessage = "Authentication is not enabled in the Firebase Console. Please enable Email/Password in the Authentication tab.";
-      }
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: errorMessage,
+        description: error.message || "Invalid credentials. Please try again.",
       });
     } finally {
       setIsLoading(false);

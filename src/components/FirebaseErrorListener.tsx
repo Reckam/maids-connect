@@ -10,12 +10,12 @@ export function FirebaseErrorListener() {
 
   useEffect(() => {
     const handlePermissionError = (error: FirestorePermissionError) => {
-      // We do not use console.error here as it triggers the Next.js error overlay 
-      // which can be redundant and confusing for the user when a toast is already shown.
+      // Centrally handle permission errors without logging to console 
+      // to avoid triggering extra error screens during transitions.
       toast({
         variant: 'destructive',
-        title: 'Permission Denied',
-        description: `You do not have permission to ${error.context.operation} at ${error.context.path}.`,
+        title: 'Access Restricted',
+        description: `You don't have permission to perform this action (${error.context.operation} at ${error.context.path}).`,
       });
     };
 

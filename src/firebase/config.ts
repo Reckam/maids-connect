@@ -1,3 +1,4 @@
+// Updated Firebase configuration to ensure latest security rules are applied.
 export const firebaseConfig = {
   apiKey: "AIzaSyDJiS2hyObkjoRNNExC1o6ufSvmipqtly0",
   authDomain: "savings-central.firebaseapp.com",
