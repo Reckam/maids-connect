@@ -14,7 +14,9 @@ import {
   ChevronLeft,
   Loader2,
   ArrowLeft,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  AlertTriangle,
+  UserX
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,14 +28,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { useDoc, useFirestore, useUser } from '@/firebase';
-import { doc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useDoc, useFirestore, useUser, useCollection } from '@/firebase';
+import { doc, collection, addDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -44,6 +48,7 @@ export default function ProfileDetails() {
   const db = useFirestore();
   const { user } = useUser();
   const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Booking Form State
@@ -51,8 +56,19 @@ export default function ProfileDetails() {
   const [bookingTime, setBookingTime] = useState('');
   const [duration, setDuration] = useState('2');
 
+  // Report Form State
+  const [reportReason, setReportReason] = useState('');
+  const [reportDetails, setReportDetails] = useState('');
+
   const userRef = useMemo(() => (id && db ? doc(db, 'users', id as string) : null), [id, db]);
   const { data: profile, loading: isLoading } = useDoc(userRef);
+
+  // Fetch Reviews
+  const reviewsQuery = useMemo(() => {
+    if (!db || !id) return null;
+    return query(collection(db, 'reviews'), where('reviewee_id', '==', id));
+  }, [db, id]);
+  const { data: reviews, loading: loadingReviews } = useCollection(reviewsQuery);
 
   const handleBookNow = () => {
     if (!user) {
@@ -93,12 +109,45 @@ export default function ProfileDetails() {
         });
         router.push('/bookings');
       })
-      .catch(async (error) => {
+      .catch(async () => {
         setIsSubmitting(false);
         const permissionError = new FirestorePermissionError({
           path: 'bookings',
           operation: 'create',
           requestResourceData: bookingData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
+  };
+
+  const submitReport = async () => {
+    if (!db || !user || !profile) return;
+    setIsSubmitting(true);
+
+    const reportData = {
+      reporter_id: user.uid,
+      reported_id: id,
+      reason: reportReason,
+      details: reportDetails,
+      status: 'pending',
+      created_at: serverTimestamp(),
+    };
+
+    addDoc(collection(db, 'reports'), reportData)
+      .then(() => {
+        setIsSubmitting(false);
+        setIsReportOpen(false);
+        toast({
+          title: "Report Submitted",
+          description: "Our moderation team will review your report shortly.",
+        });
+      })
+      .catch(async () => {
+        setIsSubmitting(false);
+        const permissionError = new FirestorePermissionError({
+          path: 'reports',
+          operation: 'create',
+          requestResourceData: reportData,
         });
         errorEmitter.emit('permission-error', permissionError);
       });
@@ -126,12 +175,7 @@ export default function ProfileDetails() {
         <Button variant="ghost" size="icon" className="rounded-full mr-4" onClick={() => router.back()}>
             <ArrowLeft />
         </Button>
-        <Link href="/browse">
-          <Button variant="ghost" size="icon" className="rounded-full mr-4">
-             <ChevronLeft />
-          </Button>
-        </Link>
-        <span className="font-bold text-xl text-primary">Maid Profile</span>
+        <span className="font-bold text-xl text-primary">Professional Profile</span>
       </nav>
 
       <div className="max-w-6xl mx-auto px-6 pt-24">
@@ -155,7 +199,7 @@ export default function ProfileDetails() {
                 
                 <div className="flex justify-center gap-6 py-4 border-y border-border">
                   <div className="text-center">
-                    <p className="text-xl font-bold">{profile.rating || 0}</p>
+                    <p className="text-xl font-bold">{profile.rating || '0.0'}</p>
                     <p className="text-[10px] text-muted-foreground uppercase">Rating</p>
                   </div>
                   <div className="text-center border-x border-border px-6">
@@ -178,30 +222,18 @@ export default function ProfileDetails() {
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-lg">Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                 <div className="flex justify-between items-center text-sm">
-                   <span className="text-muted-foreground flex items-center gap-2">
-                     <Clock className="w-4 h-4" /> Availability
-                   </span>
-                   <span className="font-medium">{profile.availability || 'Not specified'}</span>
-                 </div>
-                 <div className="flex justify-between items-center text-sm">
-                   <span className="text-muted-foreground flex items-center gap-2">
-                     <Briefcase className="w-4 h-4" /> Languages
-                   </span>
-                   <span className="font-medium">{(profile.languages || []).join(', ') || 'Not specified' }</span>
-                 </div>
-              </CardContent>
-            </Card>
+            <Button 
+              variant="ghost" 
+              className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 rounded-xl"
+              onClick={() => setIsReportOpen(true)}
+            >
+              <AlertTriangle className="mr-2 w-4 h-4" /> Report this profile
+            </Button>
           </div>
 
           <div className="lg:col-span-2 space-y-8">
             <Card className="border-none shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader>
                 <CardTitle>About Me</CardTitle>
               </CardHeader>
               <CardContent>
@@ -218,23 +250,42 @@ export default function ProfileDetails() {
                         {skill}
                       </Badge>
                     ))}
-                    {(profile.skills || []).length === 0 && <p className='text-sm text-muted-foreground'>No skills listed.</p>}
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <div className="space-y-4">
-              <h2 className="text-2xl font-bold">Reviews</h2>
-              <div className="bg-white p-8 rounded-2xl border border-dashed text-center">
-                 <Star className="w-10 h-10 text-slate-200 mx-auto mb-2" />
-                 <p className='text-sm text-muted-foreground italic'>No reviews yet for this professional.</p>
+              <h2 className="text-2xl font-bold">Client Reviews</h2>
+              <div className="space-y-4">
+                {reviews?.map(review => (
+                  <Card key={review.id} className="border-none shadow-sm">
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start mb-4">
+                         <div className="flex items-center gap-1">
+                           {[...Array(5)].map((_, i) => (
+                             <Star key={i} className={`w-4 h-4 ${i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-slate-200'}`} />
+                           ))}
+                         </div>
+                         <span className="text-xs text-muted-foreground">{new Date(review.created_at?.seconds * 1000).toLocaleDateString()}</span>
+                      </div>
+                      <p className="text-slate-700 italic">"{review.comment}"</p>
+                    </CardContent>
+                  </Card>
+                ))}
+                {(!reviews || reviews.length === 0) && (
+                  <div className="bg-white p-12 rounded-2xl border border-dashed text-center">
+                    <Star className="w-10 h-10 text-slate-200 mx-auto mb-2" />
+                    <p className='text-sm text-muted-foreground italic'>No reviews yet for this professional.</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Booking Dialog */}
       <Dialog open={isBookingOpen} onOpenChange={setIsBookingOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -277,22 +328,59 @@ export default function ProfileDetails() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="pt-4 border-t mt-2">
-              <div className="flex justify-between items-center text-sm font-bold">
-                 <span>Total Price:</span>
-                 <span className="text-primary text-lg">UGX {(profile.hourly_rate * parseInt(duration)).toLocaleString()}</span>
-              </div>
+          </div>
+          <DialogFooter>
+            <Button disabled={isSubmitting} onClick={confirmBooking} className="bg-primary w-full">
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CalendarIcon className="w-4 h-4 mr-2" />}
+              Send Booking Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Report Dialog */}
+      <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserX className="w-5 h-5 text-red-500" /> Report Profile
+            </DialogTitle>
+            <DialogDescription>
+              Tell us why you are reporting this user. Your report is anonymous.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Reason for Report</Label>
+              <Select value={reportReason} onValueChange={setReportReason}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="misleading">Misleading Profile</SelectItem>
+                  <SelectItem value="inappropriate">Inappropriate Behavior</SelectItem>
+                  <SelectItem value="safety">Safety Concerns</SelectItem>
+                  <SelectItem value="spam">Spam or Fake Account</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Details (Optional)</Label>
+              <Textarea 
+                placeholder="Provide more context..." 
+                value={reportDetails}
+                onChange={(e) => setReportDetails(e.target.value)}
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsBookingOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setIsReportOpen(false)}>Cancel</Button>
             <Button 
-              disabled={!bookingDate || !bookingTime || isSubmitting} 
-              onClick={confirmBooking}
-              className="bg-primary"
+              variant="destructive" 
+              disabled={!reportReason || isSubmitting} 
+              onClick={submitReport}
             >
-              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CalendarIcon className="w-4 h-4 mr-2" />}
-              Send Booking Request
+              Submit Report
             </Button>
           </DialogFooter>
         </DialogContent>
