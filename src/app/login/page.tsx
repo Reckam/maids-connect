@@ -46,6 +46,24 @@ export default function LoginPage() {
     },
   });
 
+  async function handleRedirectByRole(uid: string) {
+    if (!db) return;
+    const userRef = doc(db, 'users', uid);
+    const userSnap = await getDoc(userRef);
+    
+    if (userSnap.exists()) {
+      const userData = userSnap.data();
+      if (userData.user_type === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/dashboard');
+      }
+    } else {
+      // Fallback for missing profiles
+      router.push('/dashboard');
+    }
+  }
+
   async function handleGoogleSignIn() {
     if (!auth || !db) return;
     setIsGoogleLoading(true);
@@ -54,7 +72,6 @@ export default function LoginPage() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      // Check if user profile exists, if not create a default one
       const userRef = doc(db, 'users', user.uid);
       const userSnap = await getDoc(userRef);
 
@@ -62,18 +79,20 @@ export default function LoginPage() {
         await setDoc(userRef, {
           full_name: user.displayName || 'Google User',
           email: user.email,
-          user_type: 'employer', // Default to employer for Google signups
+          user_type: 'employer',
           is_verified: false,
           avatar_url: user.photoURL || `https://picsum.photos/seed/${user.uid}/200/200`,
           created_at: serverTimestamp(),
         });
+        router.push('/dashboard');
+      } else {
+        await handleRedirectByRole(user.uid);
       }
 
       toast({
         title: "Welcome!",
         description: `Signed in as ${user.displayName}`,
       });
-      router.push('/dashboard');
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -89,12 +108,12 @@ export default function LoginPage() {
     if (!auth) return;
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
+      const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
       toast({
         title: "Login Successful",
-        description: "Welcome back to Maids Connect!",
+        description: "Welcome back!",
       });
-      router.push('/dashboard');
+      await handleRedirectByRole(userCredential.user.uid);
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -114,7 +133,7 @@ export default function LoginPage() {
             <Shield className="text-primary h-10 w-10" />
             <span className="font-bold text-3xl text-primary">Maids Connect</span>
           </Link>
-          <p className="text-muted-foreground">Welcome back! Please enter your details.</p>
+          <p className="text-muted-foreground text-center">Manage your domestic help needs or your worker profile.</p>
         </div>
 
         <Card className="shadow-xl border-none">
