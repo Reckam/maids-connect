@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { Suspense } from 'react';
@@ -57,12 +58,15 @@ function RegisterForm() {
 
       await updateProfile(user, { displayName: values.full_name });
 
+      // Special check for the requested admin email
+      const finalRole = values.email.toLowerCase() === 'maids.admin@email.com' ? 'admin' : role;
+
       const userRef = doc(db, 'users', user.uid);
       await setDoc(userRef, {
         full_name: values.full_name,
         email: values.email,
-        user_type: role,
-        is_verified: false,
+        user_type: finalRole,
+        is_verified: finalRole === 'admin',
         created_at: serverTimestamp(),
         avatar_url: `https://picsum.photos/seed/${user.uid}/200/200`,
         district: "",
@@ -78,14 +82,19 @@ function RegisterForm() {
 
       toast({
         title: "Account Created",
-        description: `Welcome to Maids Connect! Your account has been created as a ${role}.`,
+        description: `Welcome! Your account has been created as an ${finalRole}.`,
       });
-      router.push('/dashboard');
+      
+      if (finalRole === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (error: any) {
       let errorMessage = error.message || "An error occurred during registration.";
       
       if (error.code === 'auth/configuration-not-found') {
-        errorMessage = "Authentication is not enabled in the Firebase Console. Please enable 'Email/Password' in the Authentication tab.";
+        errorMessage = "Authentication is not enabled in the Firebase Console. Please go to Build > Authentication and enable Email/Password.";
       }
 
       toast({
@@ -109,7 +118,7 @@ function RegisterForm() {
             <Shield className="text-primary h-10 w-10" />
             <span className="font-bold text-3xl text-primary">Maids Connect</span>
           </Link>
-          <p className="text-muted-foreground">Join as <span className="text-primary font-bold capitalize">{role}</span> today.</p>
+          <p className="text-muted-foreground">Join our community today.</p>
         </div>
 
         <Card className="shadow-xl border-none">
@@ -140,7 +149,7 @@ function RegisterForm() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="example@email.com" {...field} className="h-11" />
+                        <Input placeholder="maids.admin@email.com" {...field} className="h-11" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

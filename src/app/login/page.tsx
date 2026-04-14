@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -74,11 +75,12 @@ export default function LoginPage() {
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
+        const finalRole = user.email?.toLowerCase() === 'maids.admin@email.com' ? 'admin' : 'employer';
         await setDoc(userRef, {
           full_name: user.displayName || 'Google User',
           email: user.email,
-          user_type: 'employer',
-          is_verified: false,
+          user_type: finalRole,
+          is_verified: finalRole === 'admin',
           avatar_url: user.photoURL || `https://picsum.photos/seed/${user.uid}/200/200`,
           created_at: serverTimestamp(),
           district: "",
@@ -91,7 +93,12 @@ export default function LoginPage() {
           review_count: 0,
           experience: 0
         });
-        router.push('/dashboard');
+        
+        if (finalRole === 'admin') {
+          router.push('/admin');
+        } else {
+          router.push('/dashboard');
+        }
       } else {
         await handleRedirectByRole(user.uid);
       }
@@ -103,7 +110,7 @@ export default function LoginPage() {
     } catch (error: any) {
       let errorMessage = error.message || "Google sign-in failed.";
       if (error.code === 'auth/configuration-not-found') {
-        errorMessage = "Authentication is not enabled in the Firebase Console. Please enable 'Google' in the Authentication tab.";
+        errorMessage = "Google Authentication is not enabled in the Firebase Console. Please enable it in the Authentication tab.";
       }
       toast({
         variant: "destructive",
@@ -128,7 +135,7 @@ export default function LoginPage() {
     } catch (error: any) {
       let errorMessage = error.message || "Invalid credentials. Please try again.";
       if (error.code === 'auth/configuration-not-found') {
-        errorMessage = "Authentication is not enabled in the Firebase Console. Please enable 'Email/Password' in the Authentication tab.";
+        errorMessage = "Authentication is not enabled in the Firebase Console. Please enable Email/Password in the Authentication tab.";
       }
       toast({
         variant: "destructive",
@@ -166,7 +173,7 @@ export default function LoginPage() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="example@email.com" {...field} className="h-11" />
+                        <Input placeholder="maids.admin@email.com" {...field} className="h-11" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
