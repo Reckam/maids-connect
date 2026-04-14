@@ -23,6 +23,8 @@ import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 
 import { useAuth, useFirestore } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -49,16 +51,20 @@ export default function LoginPage() {
   async function handleRedirectByRole(uid: string) {
     if (!db) return;
     const userRef = doc(db, 'users', uid);
-    const userSnap = await getDoc(userRef);
-    
-    if (userSnap.exists()) {
-      const userData = userSnap.data();
-      if (userData.user_type === 'admin') {
-        router.push('/admin');
+    try {
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        if (userData.user_type === 'admin') {
+          router.push('/admin');
+        } else {
+          router.push('/dashboard');
+        }
       } else {
         router.push('/dashboard');
       }
-    } else {
+    } catch (e) {
+      // If we can't read the profile, it might be a permission issue during the check
       router.push('/dashboard');
     }
   }
@@ -76,7 +82,7 @@ export default function LoginPage() {
 
       if (!userSnap.exists()) {
         const finalRole = user.email?.toLowerCase() === 'maids.admin@email.com' ? 'admin' : 'employer';
-        await setDoc(userRef, {
+        const userData = {
           full_name: user.displayName || 'Google User',
           email: user.email,
           user_type: finalRole,
@@ -92,13 +98,24 @@ export default function LoginPage() {
           rating: 0,
           review_count: 0,
           experience: 0
-        });
-        
-        if (finalRole === 'admin') {
-          router.push('/admin');
-        } else {
-          router.push('/dashboard');
-        }
+        };
+
+        setDoc(userRef, userData)
+          .then(() => {
+            if (finalRole === 'admin') {
+              router.push('/admin');
+            } else {
+              router.push('/dashboard');
+            }
+          })
+          .catch(async () => {
+            const permissionError = new FirestorePermissionError({
+              path: userRef.path,
+              operation: 'create',
+              requestResourceData: userData,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+          });
       } else {
         await handleRedirectByRole(user.uid);
       }

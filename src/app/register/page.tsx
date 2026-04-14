@@ -23,6 +23,8 @@ import { useToast } from '@/hooks/use-toast';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth, useFirestore } from '@/firebase';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const registerSchema = z.object({
   full_name: z.string().min(2, { message: "Name is too short" }),
@@ -58,11 +60,10 @@ function RegisterForm() {
 
       await updateProfile(user, { displayName: values.full_name });
 
-      // Special check for the requested admin email
       const finalRole = values.email.toLowerCase() === 'maids.admin@email.com' ? 'admin' : role;
 
       const userRef = doc(db, 'users', user.uid);
-      await setDoc(userRef, {
+      const userData = {
         full_name: values.full_name,
         email: values.email,
         user_type: finalRole,
@@ -78,19 +79,35 @@ function RegisterForm() {
         rating: 0,
         review_count: 0,
         experience: 0
-      });
+      };
 
-      toast({
-        title: "Account Created",
-        description: `Welcome! Your account has been created as an ${finalRole}.`,
-      });
-      
-      if (finalRole === 'admin') {
-        router.push('/admin');
-      } else {
-        router.push('/dashboard');
-      }
+      setDoc(userRef, userData)
+        .then(() => {
+          toast({
+            title: "Account Created",
+            description: `Welcome! Your account has been created as an ${finalRole}.`,
+          });
+          
+          if (finalRole === 'admin') {
+            router.push('/admin');
+          } else {
+            router.push('/dashboard');
+          }
+        })
+        .catch(async (error) => {
+          const permissionError = new FirestorePermissionError({
+            path: userRef.path,
+            operation: 'create',
+            requestResourceData: userData,
+          });
+          errorEmitter.emit('permission-error', permissionError);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+
     } catch (error: any) {
+      setIsLoading(false);
       let errorMessage = error.message || "An error occurred during registration.";
       
       if (error.code === 'auth/configuration-not-found') {
@@ -102,8 +119,6 @@ function RegisterForm() {
         title: "Registration Failed",
         description: errorMessage,
       });
-    } finally {
-      setIsLoading(false);
     }
   }
 
