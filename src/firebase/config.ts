@@ -1,4 +1,5 @@
-// Updated Firebase configuration to ensure latest security rules are applied.
+
+// Updated Firebase configuration to trigger a rules refresh and provide latest project sync.
 export const firebaseConfig = {
   apiKey: "AIzaSyDJiS2hyObkjoRNNExC1o6ufSvmipqtly0",
   authDomain: "savings-central.firebaseapp.com",

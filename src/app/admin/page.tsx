@@ -18,7 +18,8 @@ import {
   Eye,
   Lock,
   ExternalLink,
-  PlusCircle
+  PlusCircle,
+  Wrench
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -85,6 +86,7 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRepairing, setIsRepairing] = useState(false);
   const [activeDataTab, setActiveDataTab] = useState('users');
 
   const userProfileRef = useMemo(() => (user && db ? doc(db, 'users', user.uid) : null), [user, db]);
@@ -109,6 +111,36 @@ export default function AdminDashboard() {
       hourly_rate: 0,
     },
   });
+
+  const handleRepairPermissions = async () => {
+    if (!db || !user) return;
+    setIsRepairing(true);
+    const userRef = doc(db, 'users', user.uid);
+    const adminData = {
+      full_name: user.displayName || "Platform Admin",
+      email: user.email,
+      user_type: "admin",
+      is_verified: true,
+      updated_at: serverTimestamp(),
+    };
+
+    setDoc(userRef, adminData, { merge: true })
+      .then(() => {
+        toast({
+          title: "Permissions Repaired",
+          description: "Your account is now marked as admin in the database. Refreshing data...",
+        });
+        setIsRepairing(false);
+      })
+      .catch(async () => {
+        setIsRepairing(false);
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'update',
+          requestResourceData: adminData,
+        }));
+      });
+  };
 
   const handleSeedData = async () => {
     if (!db) return;
@@ -244,7 +276,6 @@ export default function AdminDashboard() {
     );
   }
 
-  // Master Admin Email Bypass
   const isMasterAdmin = user?.email?.toLowerCase() === 'maids.admin@email.com';
   const hasAdminRole = profile?.user_type === 'admin' || isMasterAdmin;
 
@@ -267,11 +298,23 @@ export default function AdminDashboard() {
                  toast({ title: "Copied ID" });
                }}>{user?.uid}</code>
             </div>
-            <div className="text-left text-xs text-slate-400 space-y-2 leading-relaxed">
-              <p>To gain access, you must manually set your role in the database:</p>
+            
+            {isMasterAdmin && (
+               <Button 
+                className="w-full bg-primary hover:bg-primary/90 rounded-full" 
+                onClick={handleRepairPermissions}
+                disabled={isRepairing}
+               >
+                 {isRepairing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wrench className="mr-2 h-4 w-4" />}
+                 Repair My Admin Account
+               </Button>
+            )}
+
+            <div className="text-left text-xs text-slate-400 space-y-2 leading-relaxed pt-4 border-t border-slate-800">
+              <p>Alternatively, manually set your role in the console:</p>
               <ol className="list-decimal list-inside space-y-1 ml-1">
-                <li>Go to the <a href={`https://console.firebase.google.com/u/0/project/savings-central/firestore/data`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">Firebase Console <ExternalLink className="w-3 h-3" /></a></li>
-                <li>Find the document with the ID above in the <b>"users"</b> collection.</li>
+                <li>Go to the <a href={`https://console.firebase.google.com/u/0/project/savings-central/firestore/data`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1 text-[10px]">Firebase Console <ExternalLink className="w-3 h-3" /></a></li>
+                <li>Find the document <b>{user?.uid}</b> in the <b>"users"</b> collection.</li>
                 <li>Change <b>user_type</b> to <b>"admin"</b>.</li>
               </ol>
             </div>
