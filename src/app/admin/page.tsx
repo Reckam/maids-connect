@@ -17,7 +17,8 @@ import {
   Database,
   Eye,
   Lock,
-  ExternalLink
+  ExternalLink,
+  PlusCircle
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -86,11 +87,9 @@ export default function AdminDashboard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeDataTab, setActiveDataTab] = useState('users');
 
-  // Fetch current user profile to check for admin role
   const userProfileRef = useMemo(() => (user && db ? doc(db, 'users', user.uid) : null), [user, db]);
   const { data: profile, loading: loadingProfile } = useDoc(userProfileRef);
 
-  // Memoized Queries for Dashboard Data
   const usersQuery = useMemo(() => db ? query(collection(db, 'users'), limit(50)) : null, [db]);
   const reportsQuery = useMemo(() => db ? query(collection(db, 'reports'), limit(50)) : null, [db]);
   const bookingsQuery = useMemo(() => db ? query(collection(db, 'bookings'), limit(50)) : null, [db]);
@@ -111,17 +110,74 @@ export default function AdminDashboard() {
     },
   });
 
+  const handleSeedData = async () => {
+    if (!db) return;
+    setIsSubmitting(true);
+    
+    const sampleMaids = [
+      {
+        full_name: "Nalule Florence",
+        email: "florence@example.com",
+        user_type: "maid",
+        is_verified: true,
+        district: "Kampala",
+        bio: "Professional cleaner with 5 years of experience in high-end apartments. Specialized in eco-friendly products.",
+        hourly_rate: 15000,
+        skills: ["Cleaning", "Laundry", "Cooking"],
+        rating: 4.8,
+        review_count: 12,
+        experience: 5,
+        languages: ["English", "Luganda"]
+      },
+      {
+        full_name: "Namubiru Mary",
+        email: "mary@example.com",
+        user_type: "maid",
+        is_verified: true,
+        district: "Entebbe",
+        bio: "Reliable babysitter and house help. I love children and keeping homes tidy and organized.",
+        hourly_rate: 12000,
+        skills: ["Babysitting", "Cleaning"],
+        rating: 4.5,
+        review_count: 8,
+        experience: 3,
+        languages: ["Luganda", "Swahili"]
+      }
+    ];
+
+    try {
+      for (const maid of sampleMaids) {
+        const ref = doc(collection(db, 'users'));
+        await setDoc(ref, { 
+          ...maid, 
+          created_at: serverTimestamp(), 
+          avatar_url: `https://picsum.photos/seed/${ref.id}/400/400` 
+        });
+      }
+      toast({
+        title: "Database Initialized",
+        description: "Sample maids have been created. Check your Firebase console!",
+      });
+    } catch (e: any) {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: 'users',
+        operation: 'create',
+      }));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleResolveReport = (reportId: string) => {
     if (!db) return;
     const reportRef = doc(db, 'reports', reportId);
     updateDoc(reportRef, { status: 'resolved' })
       .catch(async () => {
-        const permissionError = new FirestorePermissionError({
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: reportRef.path,
           operation: 'update',
           requestResourceData: { status: 'resolved' },
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        }));
       });
   };
 
@@ -136,12 +192,11 @@ export default function AdminDashboard() {
         });
       })
       .catch(async () => {
-        const permissionError = new FirestorePermissionError({
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: userRef.path,
           operation: 'update',
           requestResourceData: { is_verified: true },
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        }));
       });
   };
 
@@ -168,17 +223,16 @@ export default function AdminDashboard() {
         form.reset();
         toast({
           title: "User Added",
-          description: `${values.full_name} has been successfully added as a ${values.user_type}.`,
+          description: `${values.full_name} has been successfully added.`,
         });
       })
       .catch(async () => {
         setIsSubmitting(false);
-        const permissionError = new FirestorePermissionError({
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: newUserRef.path,
           operation: 'create',
           requestResourceData: userData,
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        }));
       });
   };
 
@@ -190,7 +244,6 @@ export default function AdminDashboard() {
     );
   }
 
-  // Permission Check
   if (profile?.user_type !== 'admin') {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6">
@@ -205,21 +258,20 @@ export default function AdminDashboard() {
           <CardContent className="space-y-6 text-center">
             <div className="p-4 bg-slate-950 rounded-xl border border-slate-800">
                <p className="text-xs text-slate-500 mb-2 uppercase tracking-widest">Your Current User ID</p>
-               <code className="text-primary font-mono text-sm break-all select-all cursor-pointer" title="Click to copy ID" onClick={() => {
+               <code className="text-primary font-mono text-sm break-all select-all cursor-pointer" onClick={() => {
                  navigator.clipboard.writeText(user?.uid || '');
-                 toast({ title: "Copied ID", description: "Use this ID to promote yourself in the Firebase Console." });
+                 toast({ title: "Copied ID" });
                }}>{user?.uid}</code>
             </div>
             <div className="text-left text-xs text-slate-400 space-y-2 leading-relaxed">
               <p>To gain access, you must manually set your role in the database:</p>
               <ol className="list-decimal list-inside space-y-1 ml-1">
-                <li>Go to the <a href="https://console.firebase.google.com/u/0/project/savings-central/firestore/data" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center inline-flex gap-1">Firebase Console <ExternalLink className="w-3 h-3" /></a></li>
+                <li>Go to the <a href={`https://console.firebase.google.com/u/0/project/savings-central/firestore/data`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">Firebase Console <ExternalLink className="w-3 h-3" /></a></li>
                 <li>Find the document with the ID above in the <b>"users"</b> collection.</li>
-                <li>Change the <b>user_type</b> field to <b>"admin"</b>.</li>
-                <li>Refresh this page.</li>
+                <li>Change <b>user_type</b> to <b>"admin"</b>.</li>
               </ol>
             </div>
-            <Button className="w-full rounded-full h-11" variant="outline" onClick={() => router.push('/dashboard')}>
+            <Button className="w-full rounded-full" variant="outline" onClick={() => router.push('/dashboard')}>
               Return to Dashboard
             </Button>
           </CardContent>
@@ -244,94 +296,106 @@ export default function AdminDashboard() {
           </div>
         </div>
         
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90 rounded-full px-6 shadow-lg shadow-primary/20">
-              <UserPlus className="mr-2 w-4 h-4" /> Create Profile
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px] bg-slate-900 border-slate-800 text-white">
-            <DialogHeader>
-              <DialogTitle>Add New User</DialogTitle>
-              <DialogDescription className="text-slate-400">
-                Manually register a user. They will be marked as verified immediately.
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onAddUserSubmit)} className="space-y-4 py-4">
-                <FormField
-                  control={form.control}
-                  name="full_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter full name" {...field} className="bg-slate-950 border-slate-800" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-2 gap-4">
+        <div className="flex gap-3">
+          <Button 
+            variant="outline" 
+            className="border-slate-800 bg-slate-900 text-slate-400 hover:text-white rounded-full"
+            onClick={handleSeedData}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <PlusCircle className="mr-2 w-4 h-4" />}
+            Seed Sample Data
+          </Button>
+
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-primary hover:bg-primary/90 rounded-full px-6 shadow-lg shadow-primary/20">
+                <UserPlus className="mr-2 w-4 h-4" /> Create Profile
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px] bg-slate-900 border-slate-800 text-white">
+              <DialogHeader>
+                <DialogTitle>Add New User</DialogTitle>
+                <DialogDescription className="text-slate-400">
+                  Manually register a user. They will be marked as verified immediately.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onAddUserSubmit)} className="space-y-4 py-4">
                   <FormField
                     control={form.control}
-                    name="email"
+                    name="full_name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email</FormLabel>
+                        <FormLabel>Full Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="email@example.com" {...field} className="bg-slate-950 border-slate-800" />
+                          <Input placeholder="Enter full name" {...field} className="bg-slate-950 border-slate-800" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input placeholder="email@example.com" {...field} className="bg-slate-950 border-slate-800" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="user_type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Role</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="bg-slate-950 border-slate-800">
+                                <SelectValue placeholder="Select role" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-slate-900 border-slate-800 text-white">
+                              <SelectItem value="maid">Maid</SelectItem>
+                              <SelectItem value="employer">Employer</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <FormField
                     control={form.control}
-                    name="user_type"
+                    name="district"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Role</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="bg-slate-950 border-slate-800">
-                              <SelectValue placeholder="Select role" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="bg-slate-900 border-slate-800 text-white">
-                            <SelectItem value="maid">Maid</SelectItem>
-                            <SelectItem value="employer">Employer</SelectItem>
-                            <SelectItem value="admin">Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <FormLabel>District</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. Kampala" {...field} className="bg-slate-950 border-slate-800" />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                </div>
-                <FormField
-                  control={form.control}
-                  name="district"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>District</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. Kampala" {...field} className="bg-slate-950 border-slate-800" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <DialogFooter className="mt-6">
-                  <Button type="submit" className="w-full rounded-full" disabled={isSubmitting}>
-                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                    Save User
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+                  <DialogFooter className="mt-6">
+                    <Button type="submit" className="w-full rounded-full" disabled={isSubmitting}>
+                      {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                      Save User
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </header>
 
       {/* Stats Overview */}
@@ -409,6 +473,9 @@ export default function AdminDashboard() {
                           <TableCell className="text-right text-slate-400">{u.district || 'N/A'}</TableCell>
                         </TableRow>
                       ))}
+                      {users?.length === 0 && (
+                        <TableRow><TableCell colSpan={5} className="text-center py-10 text-slate-500 italic">No users found. Try seeding sample data.</TableCell></TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 )}
@@ -443,7 +510,7 @@ export default function AdminDashboard() {
                         </TableRow>
                       ))}
                       {bookings?.length === 0 && (
-                        <TableRow><TableCell colSpan={5} className="text-center py-10 text-slate-500">No bookings found in database.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="text-center py-10 text-slate-500 italic">No bookings found in database.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -469,11 +536,13 @@ export default function AdminDashboard() {
                               {report.status}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right text-slate-400 text-xs">{report.created_at}</TableCell>
+                          <TableCell className="text-right text-slate-400 text-xs">
+                             {report.created_at?.seconds ? new Date(report.created_at.seconds * 1000).toLocaleDateString() : 'N/A'}
+                          </TableCell>
                         </TableRow>
                       ))}
                       {reports?.length === 0 && (
-                        <TableRow><TableCell colSpan={4} className="text-center py-10 text-slate-500">No reports found in database.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={4} className="text-center py-10 text-slate-500 italic">No reports found in database.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
